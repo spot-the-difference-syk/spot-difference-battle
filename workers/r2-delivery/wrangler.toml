@@ -2,12 +2,15 @@ name = "spot-difference-r2-canary"
 main = "src/index.mjs"
 compatibility_date = "2026-09-16"
 
+[cache]
+enabled = true
+
 [[r2_buckets]]
 binding = "PUZZLE_ASSETS"
 bucket_name = "spot-difference-assets"
 
 # Worker 요청 실패율과 R2 miss 를 운영에서 확인하기 위한 설정이다.
-# (OWNERSHIP.md Workers 완료 기준) 대시보드 Workers > Logs 에서
+# 대시보드 Workers > Logs 에서
 # outcome 별로 필터링할 수 있다.
 [observability]
 enabled = true

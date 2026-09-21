@@ -1,7 +1,6 @@
 /**
  * Private R2 퍼즐 이미지 전달 Worker.
  *
- * 소유권과 완료 기준은 docs/OWNERSHIP.md 를 따른다.
  * 이 Worker 는 Supabase 를 조회하지 않는다. 게임 서버가 확정한
  * puzzleId 와 assetVersion 으로 브라우저가 URL 을 만들고, 여기서는
  * 허용된 경로만 R2 object key 로 매핑한다.
@@ -24,8 +23,7 @@ const ALLOWED_ASSETS = new Set([
 /**
  * 결과 구분.
  *
- * OWNERSHIP.md 완료 기준: "없는 객체, 잘못된 버전과 traversal 입력을
- * 구분 가능한 상태 코드로 처리한다."
+ * 없는 객체, 잘못된 버전과 traversal 입력은 구분 가능한 상태 코드로 처리한다.
  *
  *   bad_path       400  경로 형식 위반. traversal·잘못된 버전 형식·알 수 없는 kind
  *   not_allowed    404  형식은 맞지만 서빙 대상이 아닌 puzzleId/assetVersion
@@ -40,6 +38,7 @@ const OUTCOME = {
   bad_path: { status: 400, level: "warn", body: "Bad Request" },
   not_allowed: { status: 404, level: "warn", body: "Not Found" },
   asset_missing: { status: 502, level: "error", body: "Bad Gateway" },
+  internal_error: { status: 500, level: "error", body: "Internal Server Error" },
   method_not_allowed: { status: 405, level: "warn", body: "Method Not Allowed" },
 };
 
@@ -51,6 +50,7 @@ const BASE_HEADERS = { "X-Content-Type-Options": "nosniff" };
  * (이전 max-age=300 은 재방문마다 이미지를 다시 받게 했다.)
  */
 const IMMUTABLE_CACHE = "public, max-age=31536000, immutable";
+const CACHEABLE_OUTCOMES = new Set(["ok", "not_modified"]);
 
 /**
  * 구조화 로그 한 줄.
@@ -70,9 +70,10 @@ const defaultLog = createLogger();
 
 function respond(outcome, { headers = {}, body = null } = {}) {
   const spec = OUTCOME[outcome];
+  const cacheHeaders = CACHEABLE_OUTCOMES.has(outcome) ? {} : { "Cache-Control": "no-store" };
   return new Response(body ?? spec.body ?? null, {
     status: spec.status,
-    headers: { ...BASE_HEADERS, ...headers },
+    headers: { ...BASE_HEADERS, ...cacheHeaders, ...headers },
   });
 }
 
@@ -107,7 +108,13 @@ export async function handleRequest(request, env, options = {}) {
   }
 
   const key = `puzzles/${pairId}/${assetVersion}/runtime/${kind}.webp`;
-  const object = await env.PUZZLE_ASSETS.get(key);
+  let object;
+  try {
+    object = await env.PUZZLE_ASSETS.get(key);
+  } catch {
+    log("internal_error", { method, pairId, assetVersion, kind });
+    return respond("internal_error");
+  }
   if (!object) {
     // 허용 목록에 있는데 객체가 없다. 업로드 누락이거나 카탈로그 불일치다.
     log("asset_missing", { method, pairId, assetVersion, kind });
