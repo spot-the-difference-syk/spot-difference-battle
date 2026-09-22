@@ -5,9 +5,28 @@ import { handleRequest } from "../src/index.mjs";
 const originalPath = "/puzzles/home-office/2026-08-28.2/runtime/original.webp";
 const modifiedPath = "/puzzles/home-office/2026-08-28.2/runtime/modified.webp";
 
-function environment(isMissing = false) {
-  const get = mock.fn(async () => isMissing ? null : ({ body: new Blob(["webp"]).stream(), httpEtag: '"abc123"' }));
-  return { env: { PUZZLE_ASSETS: { get } }, get };
+function environment(isMissing = false, failure = null) {
+  const get = mock.fn(async () => {
+    if (failure) throw failure;
+    return isMissing ? null : ({ body: new Blob(["webp"]).stream(), httpEtag: '"abc123"' });
+  });
+  const put = mock.fn();
+  const remove = mock.fn();
+  const list = mock.fn();
+  return { env: { PUZZLE_ASSETS: { get, put, delete: remove, list } }, get, put, remove, list };
+}
+
+function assertFailure(response, status) {
+  assert.equal(response.status, status);
+  assert.equal(response.headers.get("Cache-Control"), "no-store");
+  assert.notEqual(response.headers.get("Cache-Control"), "public, max-age=31536000, immutable");
+  assert.equal(response.headers.get("X-Content-Type-Options"), "nosniff");
+}
+
+function assertNoMutation({ put, remove, list }) {
+  assert.equal(put.mock.callCount(), 0);
+  assert.equal(remove.mock.callCount(), 0);
+  assert.equal(list.mock.callCount(), 0);
 }
 
 /** 로그를 모아 outcome 을 확인한다. */
@@ -42,7 +61,7 @@ describe("R2 delivery canary", () => {
     test(`rejects ${method} without accessing R2`, async () => {
       const { env, get } = environment();
       const response = await handleRequest(new Request(`https://canary.example${originalPath}`, { method }), env);
-      assert.equal(response.status, 405);
+      assertFailure(response, 405);
       assert.equal(response.headers.get("Allow"), "GET, HEAD");
       assert.equal(get.mock.callCount(), 0);
     });
@@ -50,9 +69,6 @@ describe("R2 delivery canary", () => {
 });
 
 /**
- * OWNERSHIP.md 완료 기준:
- * "없는 객체, 잘못된 버전과 traversal 입력을 구분 가능한 상태 코드로 처리한다."
- *
  * 이전에는 네 경우가 모두 404 라 로그에서 운영 사고를 골라낼 수 없었다.
  */
 describe("거부 사유별 상태 코드", () => {
@@ -70,7 +86,7 @@ describe("거부 사유별 상태 코드", () => {
       const { env, get } = environment();
       const { log, lines } = recorder();
       const response = await handleRequest(new Request(`https://canary.example${path}`), env, { log });
-      assert.equal(response.status, 400);
+      assertFailure(response, 400);
       assert.equal(get.mock.callCount(), 0, "형식 위반은 R2 조회 전에 거부해야 한다");
       assert.equal(lines[0].outcome, "bad_path");
     });
@@ -84,7 +100,7 @@ describe("거부 사유별 상태 코드", () => {
       env,
       { log },
     );
-    assert.equal(response.status, 404);
+    assertFailure(response, 404);
     assert.equal(get.mock.callCount(), 0);
     assert.equal(lines[0].outcome, "not_allowed");
     assert.equal(lines[0].pairId, "unknown");
@@ -98,7 +114,7 @@ describe("거부 사유별 상태 코드", () => {
       env,
       { log },
     );
-    assert.equal(response.status, 404);
+    assertFailure(response, 404);
     assert.equal(get.mock.callCount(), 0);
     assert.equal(lines[0].outcome, "not_allowed");
     assert.equal(lines[0].assetVersion, "2099-01-01.1");
@@ -108,7 +124,7 @@ describe("거부 사유별 상태 코드", () => {
     const { env, get } = environment(true);
     const { log, lines } = recorder();
     const response = await handleRequest(new Request(`https://canary.example${originalPath}`), env, { log });
-    assert.equal(response.status, 502, "운영 사고는 정상 거부와 구분돼야 한다");
+    assertFailure(response, 502);
     assert.equal(get.mock.callCount(), 1, "허용된 경로이므로 R2 조회까지는 간다");
     assert.equal(lines[0].outcome, "asset_missing");
   });
@@ -127,6 +143,47 @@ describe("거부 사유별 상태 코드", () => {
     }
     assert.equal(statuses.size, 4, `구분 가능해야 한다: ${[...statuses]}`);
   });
+  test("500 — R2 예외는 내부 정보를 노출하지 않고 no-store로 응답한다", async () => {
+    const privateError = new Error("private R2 object detail");
+    const context = environment(false, privateError);
+    const { log, lines } = recorder();
+    const response = await handleRequest(new Request(`https://canary.example${originalPath}`, {
+      headers: { Authorization: "Bearer secret-token" },
+    }), context.env, { log });
+    const body = await response.text();
+
+    assertFailure(response, 500);
+    assert.equal(body, "Internal Server Error");
+    assert.ok(!body.includes(privateError.message));
+    assert.equal(lines[0].outcome, "internal_error");
+    assert.deepEqual(lines[0], {
+      outcome: "internal_error",
+      method: "GET",
+      pairId: "home-office",
+      assetVersion: "2026-08-28.2",
+      kind: "original",
+    });
+    const serializedLog = JSON.stringify(lines);
+    assert.ok(!serializedLog.includes(privateError.message));
+    assert.ok(!serializedLog.includes("canary.example"));
+    assert.ok(!serializedLog.includes("secret-token"));
+    assertNoMutation(context);
+  });
+
+  test("R2 mutation API는 성공과 모든 실패 경로에서 호출되지 않는다", async () => {
+    const contexts = [
+      [environment(), new Request(`https://canary.example${originalPath}`)],
+      [environment(), new Request("https://canary.example/nope")],
+      [environment(), new Request("https://canary.example/puzzles/unknown/2026-08-28.2/runtime/original.webp")],
+      [environment(true), new Request(`https://canary.example${originalPath}`)],
+      [environment(false, new Error("failure")), new Request(`https://canary.example${originalPath}`)],
+      [environment(), new Request(`https://canary.example${originalPath}`, { method: "POST" })],
+    ];
+    for (const [context, request] of contexts) {
+      await handleRequest(request, context.env, { log: () => {} });
+      assertNoMutation(context);
+    }
+  });
 });
 
 describe("관측", () => {
@@ -140,10 +197,15 @@ describe("관측", () => {
     const { env: missingEnv } = environment(true);
     await handleRequest(new Request(`https://canary.example${originalPath}`), missingEnv, { log });
     await handleRequest(new Request("https://canary.example/nope"), okEnv, { log });
+    const { env: failedEnv } = environment(false, new Error("private R2 detail"));
+    await handleRequest(new Request(`https://canary.example${originalPath}`), failedEnv, { log });
 
     assert.equal(sink.log.mock.callCount(), 1, "정상은 log");
-    assert.equal(sink.error.mock.callCount(), 1, "R2 miss 는 error");
+    assert.equal(sink.error.mock.callCount(), 2, "R2 miss 와 internal error 는 error");
     assert.equal(sink.warn.mock.callCount(), 1, "거부는 warn");
+    const internalLog = sink.error.mock.calls[1].arguments[0];
+    assert.equal(JSON.parse(internalLog).outcome, "internal_error");
+    assert.ok(!internalLog.includes("private R2 detail"));
   });
 
   test("로그가 JSON 한 줄이고 경로 조각만 담는다", async () => {

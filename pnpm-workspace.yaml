@@ -11,3 +11,4 @@ allowBuilds:
   '@tailwindcss/oxide': true
   esbuild: true
   protobufjs: true
+  workerd: true
