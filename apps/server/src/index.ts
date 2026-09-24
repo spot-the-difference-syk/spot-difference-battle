@@ -1,3 +1,5 @@
+import { resolveMatchStoreKind, resolvePuzzleCatalogSource } from "./config/runtime.js";
+import { loadDatabasePuzzles } from "./persistence/puzzle-catalog.js";
 import { createGameServer } from "./server.js";
 import { InMemoryMatchStore, SupabasePostgresMatchStore } from "./persistence/match-store.js";
 import {
@@ -21,20 +23,21 @@ if (
 }
 const sceneId = configuredSceneId as GameSceneId | undefined;
 const supabaseDatabaseUrl = process.env.SUPABASE_DB_URL?.trim();
-const useMemoryStore = process.env.NODE_ENV !== "production" && process.env.STORAGE_DRIVER === "memory";
-if (!supabaseDatabaseUrl && !useMemoryStore) {
-  throw new Error(
-    "SUPABASE_DB_URL is required. STORAGE_DRIVER=memory is allowed only for explicit local tests.",
-  );
+const storeKind = resolveMatchStoreKind(process.env);
+const catalogSource = resolvePuzzleCatalogSource(process.env.PUZZLE_CATALOG_SOURCE);
+if (catalogSource === "database" && !supabaseDatabaseUrl) {
+  throw new Error("SUPABASE_DB_URL is required for database puzzle catalog.");
 }
-const matchStore = supabaseDatabaseUrl
-  ? new SupabasePostgresMatchStore(supabaseDatabaseUrl)
+const puzzles = catalogSource === "database" ? await loadDatabasePuzzles(supabaseDatabaseUrl!) : undefined;
+const matchStore = storeKind === "postgres"
+  ? new SupabasePostgresMatchStore(supabaseDatabaseUrl!)
   : new InMemoryMatchStore();
 const app = await createGameServer({
   webOrigin,
   staticRoot,
   matchStore,
   sceneId,
+  puzzles,
 });
 
 try {
