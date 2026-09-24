@@ -1,6 +1,6 @@
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
-import { GameMatch, GameRuleError } from "@spot-battle/game-core";
+import { GameMatch, GameRuleError, type MatchPuzzle } from "@spot-battle/game-core";
 import {
   DEFAULT_MATCH_SETTINGS,
   GAME_CONFIG,
@@ -37,6 +37,7 @@ export interface GameServerOptions {
   /** 비활성 게스트 세션을 확인하는 주기. */
   guestSessionCleanupIntervalMs?: number;
   matchStore?: MatchStore;
+  puzzles?: readonly MatchPuzzle[];
   /** 통합 테스트 등에서 특정 장면으로 매칭을 고정한다. */
   sceneId?: GameSceneId;
 }
@@ -95,6 +96,10 @@ type GameSocket = Socket<
 >;
 
 export async function createGameServer(options: GameServerOptions): Promise<FastifyInstance> {
+  const catalog = options.puzzles ?? GAME_PUZZLES;
+  if (!catalog.length) throw new Error("Puzzle catalog is empty.");
+  const requestedPuzzle = options.sceneId ? catalog.find((puzzle) => puzzle.id === options.sceneId) : undefined;
+  if (options.puzzles && options.sceneId && !requestedPuzzle) throw new Error("Requested scene is absent from the active catalog.");
   const app = Fastify({ logger: options.logger ?? false });
   if (options.webOrigin) {
     await app.register(cors, { origin: options.webOrigin });
@@ -106,8 +111,9 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
     });
   }
   const matchStore = options.matchStore ?? new InMemoryMatchStore();
-  app.get("/health", async () => {
+  app.get("/health", async (_request, reply) => {
     const database = await matchStore.health();
+    if (!database) reply.code(503);
     return { status: database ? "ok" : "degraded", server: "ok", database };
   });
 
@@ -119,10 +125,7 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
   >(app.server, {
     cors: options.webOrigin ? { origin: options.webOrigin } : undefined,
   });
-  const requestedPuzzle = options.sceneId
-    ? GAME_PUZZLES.find((puzzle) => puzzle.id === options.sceneId)
-    : undefined;
-  const registry = new MatchRegistry(requestedPuzzle ? [requestedPuzzle] : undefined);
+  const registry = new MatchRegistry(requestedPuzzle ? [requestedPuzzle] : options.puzzles);
   const guestSessionRetentionMs = options.guestSessionRetentionMs ?? 7 * 24 * 60 * 60 * 1_000;
   const guestSessionCleanupIntervalMs = options.guestSessionCleanupIntervalMs ?? 60 * 1_000;
   const sessions = new GuestSessionRegistry(guestSessionRetentionMs);
