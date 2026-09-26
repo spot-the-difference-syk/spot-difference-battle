@@ -382,4 +382,33 @@ describe("simultaneous game server", () => {
     second.emit("game:ready", { matchId });
     expect((await preload).currentPuzzleId).toBe("enchanted-forest");
   });
+  it("keeps a valid code-mode GAME_SCENE_ID selection", async () => {
+    const first = await connect();
+    const second = await connect();
+    const ready = waitForState(first, "READY");
+    first.emit("queue:join", { nickname: "first" });
+    second.emit("queue:join", { nickname: "second" });
+    expect((await ready).currentPuzzleId).toBe("enchanted-forest");
+  });
+
+  it("selects home-office from the injected active catalog", async () => {
+    await app.close();
+    const homeOffice = GAME_PUZZLES.find((item) => item.id === "home-office")!;
+    app = await createGameServer({ puzzles: [homeOffice], sceneId: "home-office" });
+    await app.listen({ host: "127.0.0.1", port: 0 });
+    const first = await connect();
+    const second = await connect();
+    const ready = waitForState(first, "READY");
+    first.emit("queue:join", { nickname: "first" });
+    second.emit("queue:join", { nickname: "second" });
+    expect(await ready).toMatchObject({
+      currentPuzzleId: "home-office", currentPuzzleVersion: homeOffice.assetVersion,
+    });
+  });
+
+  it("rejects a scene absent from the injected active catalog", async () => {
+    const homeOffice = GAME_PUZZLES.find((item) => item.id === "home-office")!;
+    await expect(createGameServer({ puzzles: [homeOffice], sceneId: "not-active" }))
+      .rejects.toThrow("Requested scene is absent from the active catalog.");
+  });
 });

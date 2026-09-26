@@ -7,7 +7,6 @@ import {
   GAME_DIFFICULTIES,
   GAME_MODES,
   type ClientToServerEvents,
-  type GameSceneId,
   type MatchSettings,
   type ServerToClientEvents,
 } from "@spot-battle/shared";
@@ -39,7 +38,7 @@ export interface GameServerOptions {
   matchStore?: MatchStore;
   puzzles?: readonly MatchPuzzle[];
   /** 통합 테스트 등에서 특정 장면으로 매칭을 고정한다. */
-  sceneId?: GameSceneId;
+  sceneId?: string;
 }
 
 interface SocketData {

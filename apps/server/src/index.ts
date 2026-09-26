@@ -4,7 +4,6 @@ import { createGameServer } from "./server.js";
 import { InMemoryMatchStore, SupabasePostgresMatchStore } from "./persistence/match-store.js";
 import {
   GAME_SCENE_IDS,
-  type GameSceneId,
 } from "@spot-battle/shared";
 import { resolveWebOrigin } from "./config/web-origin.js";
 
@@ -13,18 +12,18 @@ const port = Number.parseInt(process.env.PORT ?? "3001", 10);
 const webOrigin = resolveWebOrigin(process.env.WEB_ORIGIN, process.env.NODE_ENV);
 const staticRoot = process.env.WEB_ROOT?.trim() || undefined;
 const configuredSceneId = process.env.GAME_SCENE_ID?.trim();
+const catalogSource = resolvePuzzleCatalogSource(process.env.PUZZLE_CATALOG_SOURCE);
 if (
+  catalogSource === "code" &&
   configuredSceneId &&
-  !GAME_SCENE_IDS.includes(configuredSceneId as GameSceneId)
+  !GAME_SCENE_IDS.some((id) => id === configuredSceneId)
 ) {
   throw new Error(
     `GAME_SCENE_ID must be one of: ${GAME_SCENE_IDS.join(", ")}`,
   );
 }
-const sceneId = configuredSceneId as GameSceneId | undefined;
 const supabaseDatabaseUrl = process.env.SUPABASE_DB_URL?.trim();
 const storeKind = resolveMatchStoreKind(process.env);
-const catalogSource = resolvePuzzleCatalogSource(process.env.PUZZLE_CATALOG_SOURCE);
 if (catalogSource === "database" && !supabaseDatabaseUrl) {
   throw new Error("SUPABASE_DB_URL is required for database puzzle catalog.");
 }
@@ -36,7 +35,7 @@ const app = await createGameServer({
   webOrigin,
   staticRoot,
   matchStore,
-  sceneId,
+  sceneId: configuredSceneId,
   puzzles,
 });
 
