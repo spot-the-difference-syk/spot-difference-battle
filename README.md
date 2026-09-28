@@ -1,4 +1,4 @@
-﻿# Spot Difference Battle
+# Spot Difference Battle
 
 > 문서 상태: CURRENT
 > 현재 게임 규칙의 유일한 Markdown 정본은 [`docs/GAME_RULES.md`](docs/GAME_RULES.md)다.
@@ -56,7 +56,7 @@
 - [구현 백로그](docs/IMPLEMENTATION_BACKLOG.md)
 - [UI 현황 점검](docs/UI_AUDIT.md)
 - [문제 에셋 가이드](docs/GAME_ASSETS.md)
-- [스테이징 배포 가이드](docs/DEPLOYMENT.md)
+- [컨테이너 배포 가이드](docs/DEPLOYMENT.md)
 - [저장소 구조](docs/REPOSITORY_STRUCTURE.md)
 - [솔로 퍼즐 생성 기록](docs/design/SOLO_ASSET_PROVENANCE.md)
 
@@ -97,6 +97,4 @@ pnpm test
 pnpm build
 ```
 
-자동 테스트는 동시 사전 로드·카운트다운·독립 정답 판정·제한시간 승패 우선순위를 검증한다.
-
-PostgreSQL 없이 실행하면 메모리 저장소를 사용한다. PostgreSQL·환경변수·배포 절차는 `.env.example`과 `docs/DEPLOYMENT.md`를 참고한다.
+자동 테스트는 동시 사전 로드·카운트다운·독립 정답 판정·제한시간 승패 우선순위를 검증한다. PostgreSQL 없이 실행하면 메모리 저장소를 사용한다. PostgreSQL·환경변수·컨테이너 실행은 `.env.example`과 `docs/DEPLOYMENT.md`를 참고한다.
