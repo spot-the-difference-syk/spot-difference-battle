@@ -1,51 +1,46 @@
-﻿# 스테이징 배포
+# 컨테이너 배포
 
 > 문서 상태: CURRENT
-> 기준일: 2026-08-18
+> 기준일: 2026-09-29
 
 ## 구성
 
-운영 빌드는 Fastify, Socket.IO, React 정적 파일을 하나의 웹 서비스에서 같은 도메인으로 제공합니다. 브라우저는 별도 `VITE_SERVER_URL` 없이 현재 주소의 Socket.IO에 연결합니다. 영속 저장소는 Supabase 프로젝트 `usigggufvapufvbyugbr`만 사용합니다.
+Fastify, Socket.IO, React 정적 파일은 단일 Node.js 컨테이너에서 같은 도메인으로 제공할 수 있습니다. 브라우저는 별도 `VITE_SERVER_URL`이 없으면 현재 주소의 Socket.IO에 연결합니다. 영속 저장소는 Supabase PostgreSQL을 사용합니다.
 
 - 웹·게임 서버: Docker 기반 단일 Node.js 서비스
 - 상태 확인: `GET /health`
 - 영속 저장소: Supabase PostgreSQL
-- 기본 리전: Singapore
-- 활성 문제 이미지: 웹 정적 빌드에 포함된 버전 WebP
-- 배포 정의: 루트의 `render.yaml`
+- 활성 문제 이미지: 웹 정적 빌드에 포함된 WebP
+- 컨테이너 정의: 루트의 `Dockerfile`
 
-## Render 테스트 배포
+## 빌드 및 실행
 
-1. Render에 로그인하고 **New > Blueprint**를 선택합니다.
-2. GitHub 저장소 `9barcode/spot-difference-battle`를 연결합니다.
-3. 루트의 `render.yaml`을 선택해 Blueprint를 생성합니다.
-4. Render의 `SUPABASE_DB_URL` 비밀 환경 변수에 Supabase Dashboard의 서버용 연결 문자열을 입력합니다.
-5. `pnpm db:push`로 Supabase 마이그레이션을 적용합니다.
-6. 웹 서비스의 첫 배포가 성공할 때까지 기다립니다.
-7. 생성된 `https://...onrender.com/health`가 `status: ok`를 반환하는지 확인합니다.
-8. PC와 모바일에서 동일 문제 순서·사전 로드·동시 시작·독립 문제 이동·최종 점수 동기화를 확인합니다.
-
-같은 도메인으로 서비스하므로 Render에서는 `WEB_ORIGIN`과 `VITE_SERVER_URL`을 설정하지 않습니다. 별도 웹 도메인을 분리할 때만 서버에 정확한 `WEB_ORIGIN`, 웹 빌드에 `VITE_SERVER_URL`을 지정합니다.
-
-## 무료 테스트 환경 주의사항
-
-- 무료 웹 서비스는 유휴 상태가 지속되면 정지하므로 첫 접속이 느릴 수 있습니다.
-- Supabase 무료 플랜의 DB 용량, 연결 수와 백업 정책을 확인합니다.
-- 무료 인스턴스는 단일 서버만 사용합니다. 여러 서버로 확장하려면 매칭 큐와 실시간 이벤트 상태를 Redis 등 공유 저장소로 이전해야 합니다.
-- 실제 출시 전에는 유료 DB, 백업, 로그 보존, 알림과 롤백 훈련이 필요합니다.
-
-## 로컬 운영 이미지 확인
+저장소 루트에서 데이터베이스 마이그레이션을 적용한 뒤 컨테이너를 빌드하고 실행합니다.
 
 ```powershell
-docker build -t spot-difference-battle:staging .
-docker run --rm -p 3001:3001 -e SUPABASE_DB_URL="<Supabase 연결 문자열>" spot-difference-battle:staging
+pnpm db:push
+docker build -t spot-difference-battle .
+docker run --rm -p 3001:3001 -e SUPABASE_DB_URL="<Supabase 연결 문자열>" spot-difference-battle
 ```
 
-브라우저에서 `http://localhost:3001`과 `http://localhost:3001/health`를 확인합니다. 앱 컨테이너는 DB 스키마를 변경하지 않으며, 배포 전에 저장소 루트에서 `pnpm db:push`를 실행합니다.
+실제 서비스에서는 컨테이너 운영 환경의 비밀 환경 변수 설정 기능으로 `SUPABASE_DB_URL`을 전달합니다. 연결 문자열을 저장소나 이미지에 기록하지 않습니다.
 
-## 롤백
+브라우저에서 `http://localhost:3001`과 `http://localhost:3001/health`를 확인합니다. 앱 컨테이너는 DB 스키마를 변경하지 않으므로 새 버전 배포 전에 마이그레이션을 별도로 적용해야 합니다.
 
-1. Render의 웹 서비스 **Deploys** 화면에서 직전 정상 배포를 선택합니다.
-2. **Rollback**을 실행합니다.
-3. `/health`와 두 브라우저 매칭을 다시 확인합니다.
-4. DB 스키마 변경이 포함된 경우 이전 애플리케이션과 호환되는지 먼저 확인하며, 파괴적 마이그레이션은 별도 복구 절차 없이 실행하지 않습니다.
+## 환경 변수
+
+- `SUPABASE_DB_URL`: Supabase Dashboard에서 확인한 서버용 PostgreSQL 연결 문자열
+- `PORT`: 웹 서버 포트. 기본값은 `3001`
+- `HOST`: 바인딩 주소. 컨테이너에서는 `0.0.0.0` 사용
+- `WEB_ORIGIN`: 웹 앱이 별도 도메인일 때 허용할 웹 주소
+- `VITE_SERVER_URL`: 웹 앱과 서버가 다른 도메인일 때 웹 빌드 시 지정하는 서버 주소
+- `WEB_ROOT`: 서버가 제공할 빌드된 웹 앱 경로
+
+웹과 서버를 같은 도메인으로 제공하면 `WEB_ORIGIN`과 `VITE_SERVER_URL`을 비워 둡니다. 자세한 개발 기본값은 `.env.example`을 참고합니다.
+
+## 배포 확인 및 되돌리기
+
+- 배포된 서비스의 `/health`가 정상 응답하는지 확인합니다.
+- PC와 모바일에서 매칭·준비·동시 시작·문제 이동·최종 점수 동기화를 확인합니다.
+- 문제가 생기면 사용 중인 컨테이너 플랫폼에서 직전 정상 이미지 버전으로 되돌린 뒤 상태 확인과 2인 매칭을 다시 테스트합니다.
+- 여러 서버 인스턴스로 확장하려면 Socket.IO 세션과 실시간 경기 상태를 공유하는 구성이 필요합니다.
