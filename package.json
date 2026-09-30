@@ -11,7 +11,7 @@
     "build:ait": "pnpm --filter @spot-battle/web build:ait",
     "build:cloudflare": "node scripts/build-cloudflare.mjs web",
     "build:ait:cloudflare": "node scripts/build-cloudflare.mjs ait",
-    "deploy:cloudflare": "pnpm build:packages && pnpm build:cloudflare && pnpm --filter @spot-battle/realtime deploy",
+    "deploy:cloudflare": "pnpm build:packages && pnpm build:cloudflare && pnpm --filter @spot-battle/realtime run deploy",
     "e2e:cloudflare": "playwright test --config playwright.cloudflare.config.ts",
     "build:packages": "pnpm --filter @spot-battle/shared --filter @spot-battle/game-core build",
     "db:push": "npx supabase@2.117.0 db push --linked",
