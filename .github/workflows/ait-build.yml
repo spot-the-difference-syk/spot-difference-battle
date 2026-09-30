@@ -43,6 +43,12 @@ jobs:
       - name: Run browser E2E
         run: pnpm e2e
 
+      - name: Run Cloudflare browser E2E
+        run: pnpm e2e:cloudflare
+
+      - name: Verify Cloudflare Worker bundle
+        run: pnpm --filter @spot-battle/realtime build
+
       - name: Build Apps in Toss bundle
         run: pnpm build:ait
 

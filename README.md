@@ -57,6 +57,7 @@
 - [UI 현황 점검](docs/UI_AUDIT.md)
 - [문제 에셋 가이드](docs/GAME_ASSETS.md)
 - [컨테이너 배포 가이드](docs/DEPLOYMENT.md)
+- [Cloudflare 웹·실시간 대전 배포](docs/CLOUDFLARE_DEPLOYMENT.md)
 - [저장소 구조](docs/REPOSITORY_STRUCTURE.md)
 - [솔로 퍼즐 생성 기록](docs/design/SOLO_ASSET_PROVENANCE.md)
 
