@@ -24,8 +24,7 @@ new_sqlite_classes = ["GameLobby"]
 [observability]
 enabled = true
 
-# Supabase 연동 시 계정에서 만든 Hyperdrive ID로 활성화한다.
-# [[hyperdrive]]
-# binding = "HYPERDRIVE"
-# id = "<hyperdrive-id>"
-# localConnectionString = "postgresql://localhost:5432/spot_battle"
+# Production Hyperdrive (query caching disabled).
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "a7dc233f1b3741bab30cad00c06344d2"
