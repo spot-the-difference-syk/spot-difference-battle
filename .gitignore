@@ -8,3 +8,6 @@ test-results/
 *.log
 *.ait
 .DS_Store
+.wrangler/
+.cloudflare-test-state/
+.dev.vars

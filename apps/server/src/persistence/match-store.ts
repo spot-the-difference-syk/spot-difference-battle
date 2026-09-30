@@ -6,7 +6,7 @@ import {
   type ReportReason,
 } from "@spot-battle/shared";
 import { randomUUID } from "node:crypto";
-import { Pool } from "pg";
+import { Pool, type PoolConfig } from "pg";
 
 export interface ReportInput {
   matchId: string;
@@ -101,8 +101,8 @@ export class InMemoryMatchStore implements MatchStore {
 export class SupabasePostgresMatchStore implements MatchStore {
   private readonly pool: Pool;
 
-  constructor(connectionString: string) {
-    this.pool = new Pool({ connectionString });
+  constructor(connectionString: string, options: Pick<PoolConfig, "connectionTimeoutMillis" | "query_timeout" | "max"> = {}) {
+    this.pool = new Pool({ connectionString, ...options });
   }
 
   async health(): Promise<boolean> {

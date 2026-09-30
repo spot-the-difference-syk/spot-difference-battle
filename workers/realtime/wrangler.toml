@@ -1,0 +1,31 @@
+name = "spot-difference-game"
+main = "src/index.ts"
+compatibility_date = "2026-09-16"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "../../apps/web/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/ws", "/health"]
+
+[vars]
+ALLOWED_ORIGINS = "https://spot-difference-syk.web.tossmini.com,https://spot-difference-syk.private-web.tossmini.com"
+PUZZLE_CATALOG_SOURCE = "code"
+
+[[durable_objects.bindings]]
+name = "GAME_LOBBY"
+class_name = "GameLobby"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GameLobby"]
+
+[observability]
+enabled = true
+
+# Supabase 연동 시 계정에서 만든 Hyperdrive ID로 활성화한다.
+# [[hyperdrive]]
+# binding = "HYPERDRIVE"
+# id = "<hyperdrive-id>"
+# localConnectionString = "postgresql://localhost:5432/spot_battle"

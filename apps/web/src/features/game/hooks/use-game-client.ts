@@ -1,7 +1,6 @@
 import { GAME_PUZZLE_ASSET_MANIFEST } from "@spot-battle/shared";
 import type {
   AnswerRegion,
-  ClientToServerEvents,
   FoundMark,
   GameErrorPayload,
   GamePuzzleId,
@@ -11,15 +10,14 @@ import type {
   MatchFoundPayload,
   NormalizedPoint,
   ReportReason,
-  ServerToClientEvents,
   SessionReadyPayload,
 } from "@spot-battle/shared";
 import { useEffect, useRef, useState } from "react";
-import { io, type Socket } from "socket.io-client";
+import { createGameConnection, type GameConnection } from "../transport/game-connection.js";
 import { resolveServerUrl } from "../../../config/server-url.js";
 import { shouldAcceptGameSnapshot } from "../model/game-snapshot.js";
 
-type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
+type GameSocket = GameConnection;
 type LobbyPhase = "NICKNAME" | "LOBBY" | "MATCHING" | "IN_GAME";
 
 const SERVER_URL = resolveServerUrl(
@@ -61,10 +59,7 @@ export function useGameClient() {
   const [reportId, setReportId] = useState<string | null>(null);
 
   useEffect(() => {
-    const socket: GameSocket = io(SERVER_URL, {
-      reconnection: true,
-      auth: { guestToken: readStorage(GUEST_TOKEN_KEY) },
-    });
+    const socket = createGameConnection(SERVER_URL, readStorage(GUEST_TOKEN_KEY), import.meta.env.VITE_GAME_TRANSPORT);
     socketRef.current = socket;
     socket.on("session:ready", ({ guestToken }: SessionReadyPayload) => {
       writeStorage(GUEST_TOKEN_KEY, guestToken);
