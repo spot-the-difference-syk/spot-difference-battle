@@ -1,5 +1,4 @@
 import { DEFAULT_LOADOUT, normalizeLoadout, normalizeOwnedItems, ownedItemIds, type CosmeticLoadout } from "./cosmetics.js";
-import { GAME_PUZZLE_IDS, SOLO_PUZZLE_IDS } from "../puzzles/asset-manifest.js";
 import type { GameSnapshot } from "./types.js";
 
 export interface PlayerStats {
@@ -119,12 +118,10 @@ export const DAILY_GOALS: ReadonlyArray<{ id: string; label: string; target: num
   { id: "find-20", label: "대결에서 차이 20개 찾기", target: 20, metric: "differences" },
 ];
 
-/** 수집할 수 있는 모든 그림 */
-export const COLLECTIBLE_KEYS: readonly string[] = [
-  ...GAME_PUZZLE_IDS.map((id) => `game:${id}`),
-  ...SOLO_PUZZLE_IDS.map((id) => `solo:${id}`),
-];
-const COLLECTIBLE_SET = new Set(COLLECTIBLE_KEYS);
+/** 수집 키: "game:<퍼즐 ID>" 또는 "solo:<퍼즐 ID>". 그림은 카탈로그로 늘어나므로 형식만 검사한다. */
+const COLLECTION_KEY_PATTERN = /^(game|solo):[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const MAX_COLLECTION = 5_000;
+const isCollectionKey = (key: string) => COLLECTION_KEY_PATTERN.test(key) && key.length <= 80;
 
 const emptyStats = (): PlayerStats => ({ matches: 0, wins: 0, draws: 0, losses: 0, soloClears: 0, differencesFound: 0 });
 
@@ -217,7 +214,7 @@ export function normalizeGrowth(value: unknown): PlayerGrowth {
       differencesFound: count(stats.differencesFound),
     },
     collected: Array.isArray(input.collected)
-      ? [...new Set(input.collected.filter((key): key is string => typeof key === "string" && COLLECTIBLE_SET.has(key)))]
+      ? [...new Set(input.collected.filter((key): key is string => typeof key === "string" && isCollectionKey(key)))].slice(0, MAX_COLLECTION)
       : [],
     daily: daily && typeof daily.day === "string" && typeof daily.goalId === "string"
       ? { day: daily.day, goalId: daily.goalId, progress: count(daily.progress), done: daily.done === true }
@@ -226,7 +223,8 @@ export function normalizeGrowth(value: unknown): PlayerGrowth {
 }
 
 function collect(growth: PlayerGrowth, keys: readonly string[]): { growth: PlayerGrowth; added: string[] } {
-  const added = [...new Set(keys)].filter((key) => COLLECTIBLE_SET.has(key) && !growth.collected.includes(key));
+  const room = MAX_COLLECTION - growth.collected.length;
+  const added = [...new Set(keys)].filter((key) => isCollectionKey(key) && !growth.collected.includes(key)).slice(0, Math.max(0, room));
   return added.length ? { growth: { ...growth, collected: [...growth.collected, ...added] }, added } : { growth, added };
 }
 

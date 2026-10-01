@@ -1,4 +1,3 @@
-import { GAME_PUZZLE_ASSET_MANIFEST } from "@spot-battle/shared";
 import type {
   AnswerRegion,
   FoundMark,
@@ -16,17 +15,13 @@ import type {
 } from "@spot-battle/shared";
 import { useEffect, useRef, useState } from "react";
 import { createGameConnection, type GameConnection } from "../transport/game-connection.js";
-import { resolveServerUrl } from "../../../config/server-url.js";
+import { gameServerUrl } from "../../../config/endpoints.js";
 import { shouldAcceptGameSnapshot } from "../model/game-snapshot.js";
 
 type GameSocket = GameConnection;
 type LobbyPhase = "NICKNAME" | "LOBBY" | "MATCHING" | "IN_GAME";
 
-const SERVER_URL = resolveServerUrl(
-  import.meta.env.VITE_SERVER_URL,
-  import.meta.env.DEV,
-  window.location.href,
-);
+
 const NICKNAME_KEY = "spot-battle.nickname";
 /** Errors that mean the queue request was rejected, so the matching screen must close. */
 const QUEUE_REJECTION_CODES = new Set(["ALREADY_IN_MATCH", "INVALID_NICKNAME", "INVALID_SETTINGS", "SERVER_BUSY"]);
@@ -76,7 +71,7 @@ export function useGameClient() {
   const lastGuessAtRef = useRef(0);
 
   useEffect(() => {
-    const socket = createGameConnection(SERVER_URL, readStorage(GUEST_TOKEN_KEY), import.meta.env.VITE_GAME_TRANSPORT);
+    const socket = createGameConnection(gameServerUrl(), readStorage(GUEST_TOKEN_KEY), import.meta.env.VITE_GAME_TRANSPORT);
     socketRef.current = socket;
     socket.on("session:ready", ({ guestToken }: SessionReadyPayload) => {
       writeStorage(GUEST_TOKEN_KEY, guestToken);
@@ -197,10 +192,10 @@ export function useGameClient() {
       setPhase("LOBBY");
     },
     ready: () => match && socketRef.current?.emit("game:ready", { matchId: match.matchId }),
-    loaded: (puzzleId: GamePuzzleId) => match && socketRef.current?.emit("game:loaded", {
+    loaded: (puzzleId: GamePuzzleId, puzzleVersion: string) => match && socketRef.current?.emit("game:loaded", {
       matchId: match.matchId,
       puzzleId,
-      puzzleVersion: GAME_PUZZLE_ASSET_MANIFEST[puzzleId].version,
+      puzzleVersion,
     }),
     guess: (puzzleId: GamePuzzleId, point: NormalizedPoint) => {
       const now = Date.now();

@@ -17,15 +17,10 @@ import {
   minimumSoloHitRadius,
   soloElapsedMs,
 } from "../model/solo-engine";
-import {
-  SOLO_PUZZLES,
-  SOLO_PUZZLE_BY_ID,
-  preloadSoloPuzzle,
-  type SoloPuzzleId,
-} from "../puzzles/catalog";
+import { BUNDLED_VISUALS, preloadVisual, usePuzzleCatalog, type PuzzleVisual } from "../../catalog/puzzle-catalog";
 
 type SoloPhase = "SELECT" | "LOADING" | "COUNTDOWN" | "PLAYING" | "FINISHED";
-type SoloRecords = Partial<Record<SoloPuzzleId, number>>;
+type SoloRecords = Partial<Record<string, number>>;
 
 const RECORD_KEY = "spot-battle:solo-records:v1";
 
@@ -50,11 +45,18 @@ export function SoloGame({ nickname, growth, soloResult, onComplete, onTab }: {
   nickname: string;
   growth: GrowthView | null;
   soloResult: { reward: RewardSummary | null; limitReached: boolean } | null;
-  onComplete: (puzzleId: SoloPuzzleId, elapsedMs: number) => void;
+  onComplete: (puzzleId: string, elapsedMs: number) => void;
   onTab: (tab: AppTab) => void;
 }) {
   const [phase, setPhase] = useState<SoloPhase>("SELECT");
-  const [puzzleId, setPuzzleId] = useState<SoloPuzzleId>("observatory");
+  const catalog = usePuzzleCatalog();
+  const soloPuzzles = useMemo(() => {
+    const isPlayable = (visual: PuzzleVisual) => visual.mode === "solo" && visual.answers?.length === SOLO_DIFFERENCE_COUNT;
+    const fromCatalog = catalog.filter(isPlayable);
+    // 카탈로그에 솔로 그림이 없으면 앱에 들어 있는 솔로 그림으로 진행한다.
+    return fromCatalog.length ? fromCatalog : BUNDLED_VISUALS.filter(isPlayable);
+  }, [catalog]);
+  const [selectedId, setPuzzleId] = useState<string>("observatory");
   const [records, setRecords] = useState<SoloRecords>(loadRecords);
   const [foundIds, setFoundIds] = useState<string[]>([]);
   const [wrongAnswers, setWrongAnswers] = useState(0);
@@ -65,10 +67,12 @@ export function SoloGame({ nickname, growth, soloResult, onComplete, onTab }: {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [viewport, setViewport] = useState<ImageViewport>({ scale: 1, pan: { x: 0, y: 0 } });
-  const puzzle = SOLO_PUZZLE_BY_ID[puzzleId];
+  const puzzle = soloPuzzles.find((candidate) => candidate.id === selectedId) ?? soloPuzzles[0]!;
+  const puzzleId = puzzle.id;
+  const differences = puzzle.answers!;
   const foundSet = useMemo(() => new Set(foundIds), [foundIds]);
   const marks: FoundMark[] = foundIds.map((differenceId) => {
-    const difference = puzzle.differences.find((candidate) => candidate.id === differenceId)!;
+    const difference = differences.find((candidate) => candidate.id === differenceId)!;
     return { differenceId, region: difference.region };
   });
   const runningMs = startedAtMs === null
@@ -94,7 +98,7 @@ export function SoloGame({ nickname, growth, soloResult, onComplete, onTab }: {
     setFinishedMs(null);
     setStartedAtMs(null);
     try {
-      await preloadSoloPuzzle(puzzleId);
+      await preloadVisual(puzzle);
       setCountdown(3);
       setPhase("COUNTDOWN");
       let remaining = 3;
@@ -118,7 +122,7 @@ export function SoloGame({ nickname, growth, soloResult, onComplete, onTab }: {
   const selectPoint = (point: NormalizedPoint, context: ImageSelectionContext) => {
     if (phase !== "PLAYING" || startedAtMs === null) return;
     const found = findSoloDifference(
-      puzzle.differences,
+      differences,
       foundSet,
       point,
       minimumSoloHitRadius(context.pointerType, context.boardSizePx),
@@ -171,16 +175,16 @@ export function SoloGame({ nickname, growth, soloResult, onComplete, onTab }: {
           <h1 className="display-title mt-1">솔로 타임어택</h1>
           <p className="muted mt-2 text-[15px]">힌트 없이 작은 차이 5개를 찾아요. 틀릴 때마다 기록에 3초가 더해져요.</p>
           <div className="solo-grid mt-6">
-            {SOLO_PUZZLES.map((candidate) => {
+            {soloPuzzles.map((candidate) => {
               const record = records[candidate.id];
               return <button key={candidate.id} type="button" aria-pressed={puzzleId === candidate.id} onClick={() => setPuzzleId(candidate.id)} className="solo-card">
                 <span className="solo-card-image"><img src={candidate.originalSrc} alt=""/></span>
-                <span className="solo-card-text"><strong>{candidate.label}</strong><small className={record ? "record" : ""}>{record ? `최고 ${formatSoloTime(record)}` : "최고 기록 없음"}</small></span>
+                <span className="solo-card-text"><strong>{candidate.title}</strong><small className={record ? "record" : ""}>{record ? `최고 ${formatSoloTime(record)}` : "최고 기록 없음"}</small></span>
               </button>;
             })}
           </div>
           {loadError && <p className="mt-5 text-center font-semibold text-[#c0392b]">{loadError}</p>}
-          <div className="mt-7 flex justify-center"><button data-testid="solo-puzzle-start" type="button" onClick={() => void start()} className="btn-primary w-full sm:w-auto sm:min-w-72">{puzzle.label} 시작</button></div>
+          <div className="mt-7 flex justify-center"><button data-testid="solo-puzzle-start" type="button" onClick={() => void start()} className="btn-primary w-full sm:w-auto sm:min-w-72">{puzzle.title} 시작</button></div>
         </section>
       </div>
     </PaperScreen>;
@@ -191,7 +195,7 @@ export function SoloGame({ nickname, growth, soloResult, onComplete, onTab }: {
       <section data-testid="solo-countdown" className="center-card">
         {phase === "LOADING" ? <div className="spinner-ring"/> : <div key={countdown} className="big-number tick">{countdown}</div>}
         <h1 className="mt-5 text-xl font-bold">{phase === "LOADING" ? "그림을 준비하고 있어요" : "집중하세요"}</h1>
-        <p className="mt-1 text-sm text-white/55">{puzzle.label}</p>
+        <p className="mt-1 text-sm text-white/55">{puzzle.title}</p>
       </section>
     </StageScreen>;
   }
@@ -201,7 +205,7 @@ export function SoloGame({ nickname, growth, soloResult, onComplete, onTab }: {
     return <PaperScreen ambientSrc={puzzle.originalSrc}>
       <AppHeader nickname={nickname} growth={growth}/>
       <section data-testid="solo-finished" className="center-card fade-up">
-        <p className="eyebrow">{puzzle.label}</p>
+        <p className="eyebrow">{puzzle.title}</p>
         <h1 className="display-title mt-1">5개 모두 찾았어요!</h1>
         <p className="big-number mt-6" style={{ fontSize: "clamp(64px, 16vw, 104px)" }}>{formatSoloTime(finishedMs)}</p>
         <p className="muted mt-3 text-[14px]">오답 {wrongAnswers}회 · 페널티 {wrongAnswers * SOLO_WRONG_PENALTY_MS / 1_000}초 포함</p>
@@ -221,7 +225,7 @@ export function SoloGame({ nickname, growth, soloResult, onComplete, onTab }: {
       <div className="flex items-center gap-2"><span className="pill">발견 {foundIds.length}/{SOLO_DIFFERENCE_COUNT}</span><span className={`pill ${wrongAnswers ? "bad" : ""}`}>오답 {wrongAnswers}</span><button type="button" aria-label="그만하기" className="icon-button" onClick={returnToSelection}><LogOut size={17}/></button></div>
       <ProgressTrack done={foundIds.length} total={SOLO_DIFFERENCE_COUNT}/>
       <div className="play-title">
-        <h2 className="truncate">{puzzle.label}</h2>
+        <h2 className="truncate">{puzzle.title}</h2>
         <ZoomControls viewport={viewport} onChange={setViewport}/>
       </div>
     </div>

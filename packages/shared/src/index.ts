@@ -32,6 +32,7 @@ export {
   GAME_PUZZLE_ASSET_MANIFEST,
   GAME_PUZZLE_IDS,
   SOLO_PUZZLE_IDS,
+  type BundledPuzzleId,
   type GamePuzzleId,
   type SoloPuzzleId,
   type PuzzleAssetFileMetadata,
@@ -53,7 +54,6 @@ export {
 } from "./protocol/socket-events.js";
 
 export {
-  COLLECTIBLE_KEYS,
   DAILY_GOALS,
   PROGRESSION_RULES,
   dailyGoalFor,
@@ -91,3 +91,19 @@ export {
   type CosmeticSlot,
   type PublicCosmetics,
 } from "./game/cosmetics.js";
+
+export {
+  ART_GENRES,
+  ASSET_VERSION_PATTERN,
+  BUNDLED_BATTLE_INFO,
+  BUNDLED_SOLO_PUZZLES,
+  PUZZLE_ID_PATTERN,
+  bundledPuzzleCards,
+  collectionKey,
+  puzzleObjectKey,
+  type ArtGenre,
+  type CatalogPayload,
+  type PuzzleCard,
+  type PuzzleMode,
+  type SoloAnswer,
+} from "./puzzles/catalog.js";

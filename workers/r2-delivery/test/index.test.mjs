@@ -92,48 +92,34 @@ describe("거부 사유별 상태 코드", () => {
     });
   }
 
-  test("404 — 형식은 맞지만 서빙 대상이 아닌 퍼즐", async () => {
+  test("200 — 코드에 등록하지 않은 새 퍼즐도 R2 에 있으면 서빙한다", async () => {
     const { env, get } = environment();
     const { log, lines } = recorder();
     const response = await handleRequest(
-      new Request("https://canary.example/puzzles/unknown/2026-08-28.2/runtime/original.webp"),
+      new Request("https://canary.example/puzzles/night-market/2026-10-02.1/runtime/original.webp"),
       env,
       { log },
     );
-    assertFailure(response, 404);
-    assert.equal(get.mock.callCount(), 0);
-    assert.equal(lines[0].outcome, "not_allowed");
-    assert.equal(lines[0].pairId, "unknown");
+    assert.equal(response.status, 200);
+    assert.equal(get.mock.calls[0].arguments[0], "puzzles/night-market/2026-10-02.1/runtime/original.webp");
+    assert.equal(lines[0].outcome, "ok");
+    assert.equal(lines[0].pairId, "night-market");
   });
 
-  test("404 — 형식은 맞지만 허용되지 않은 버전", async () => {
-    const { env, get } = environment();
+  test("404 — 형식은 맞지만 R2 에 객체가 없다", async () => {
+    const { env, get } = environment(true);
     const { log, lines } = recorder();
-    const response = await handleRequest(
-      new Request("https://canary.example/puzzles/home-office/2099-01-01.1/runtime/original.webp"),
-      env,
-      { log },
-    );
+    const response = await handleRequest(new Request("https://canary.example/puzzles/unknown/2099-01-01.1/runtime/original.webp"), env, { log });
     assertFailure(response, 404);
-    assert.equal(get.mock.callCount(), 0);
-    assert.equal(lines[0].outcome, "not_allowed");
+    assert.equal(get.mock.callCount(), 1);
+    assert.equal(lines[0].outcome, "asset_missing");
     assert.equal(lines[0].assetVersion, "2099-01-01.1");
   });
 
-  test("502 — 허용된 경로인데 R2 에 객체가 없다", async () => {
-    const { env, get } = environment(true);
-    const { log, lines } = recorder();
-    const response = await handleRequest(new Request(`https://canary.example${originalPath}`), env, { log });
-    assertFailure(response, 502);
-    assert.equal(get.mock.callCount(), 1, "허용된 경로이므로 R2 조회까지는 간다");
-    assert.equal(lines[0].outcome, "asset_missing");
-  });
-
-  test("네 사유가 서로 다른 상태 코드를 쓴다", async () => {
+  test("형식 위반·없는 객체·정상 응답이 서로 다른 상태 코드를 쓴다", async () => {
     const statuses = new Set();
     for (const [path, missing] of [
       ["/puzzles/home-office/2026-08-28.2/runtime/%2e%2e/x.webp", false],
-      ["/puzzles/unknown/2026-08-28.2/runtime/original.webp", false],
       [originalPath, true],
       [originalPath, false],
     ]) {
@@ -141,8 +127,9 @@ describe("거부 사유별 상태 코드", () => {
       const response = await handleRequest(new Request(`https://canary.example${path}`), env, { log: () => {} });
       statuses.add(response.status);
     }
-    assert.equal(statuses.size, 4, `구분 가능해야 한다: ${[...statuses]}`);
+    assert.equal(statuses.size, 3, `구분 가능해야 한다: ${[...statuses]}`);
   });
+
   test("500 — R2 예외는 내부 정보를 노출하지 않고 no-store로 응답한다", async () => {
     const privateError = new Error("private R2 object detail");
     const context = environment(false, privateError);
@@ -201,9 +188,9 @@ describe("관측", () => {
     await handleRequest(new Request(`https://canary.example${originalPath}`), failedEnv, { log });
 
     assert.equal(sink.log.mock.callCount(), 1, "정상은 log");
-    assert.equal(sink.error.mock.callCount(), 2, "R2 miss 와 internal error 는 error");
-    assert.equal(sink.warn.mock.callCount(), 1, "거부는 warn");
-    const internalLog = sink.error.mock.calls[1].arguments[0];
+    assert.equal(sink.error.mock.callCount(), 1, "internal error 만 error");
+    assert.equal(sink.warn.mock.callCount(), 2, "형식 위반과 없는 객체는 warn");
+    const internalLog = sink.error.mock.calls[0].arguments[0];
     assert.equal(JSON.parse(internalLog).outcome, "internal_error");
     assert.ok(!internalLog.includes("private R2 detail"));
   });

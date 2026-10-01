@@ -1,5 +1,6 @@
 import { resolveMatchStoreKind, resolvePuzzleCatalogSource } from "./config/runtime.js";
-import { loadDatabasePuzzles } from "./persistence/puzzle-catalog.js";
+import { loadDatabaseCatalog } from "./persistence/puzzle-catalog.js";
+import { CatalogService } from "./game/catalog-service.js";
 import { createGameServer } from "./server.js";
 import { InMemoryMatchStore, SupabasePostgresMatchStore } from "./persistence/match-store.js";
 import {
@@ -27,7 +28,14 @@ const storeKind = resolveMatchStoreKind(process.env);
 if (catalogSource === "database" && !supabaseDatabaseUrl) {
   throw new Error("SUPABASE_DB_URL is required for database puzzle catalog.");
 }
-const puzzles = catalogSource === "database" ? await loadDatabasePuzzles(supabaseDatabaseUrl!) : undefined;
+const assetBaseUrl = process.env.PUZZLE_ASSET_BASE_URL?.trim() || undefined;
+if (catalogSource === "database" && !assetBaseUrl) {
+  throw new Error("PUZZLE_ASSET_BASE_URL (R2 image delivery origin) is required for database puzzle catalog.");
+}
+const loadCatalog = () => loadDatabaseCatalog(supabaseDatabaseUrl!, assetBaseUrl);
+const catalog = catalogSource === "database"
+  ? new CatalogService(await loadCatalog(), loadCatalog, { assetBaseUrl, onError: (error) => console.error("catalog.refresh_failed", error instanceof Error ? error.message : "unknown") })
+  : undefined;
 const matchStore = storeKind === "postgres"
   ? new SupabasePostgresMatchStore(supabaseDatabaseUrl!)
   : new InMemoryMatchStore();
@@ -36,7 +44,7 @@ const app = await createGameServer({
   staticRoot,
   matchStore,
   sceneId: configuredSceneId,
-  puzzles,
+  catalog,
 });
 
 try {

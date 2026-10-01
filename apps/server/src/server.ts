@@ -9,7 +9,6 @@ import {
   buyCosmetic,
   emptyGrowth,
   equipCosmetic,
-  SOLO_PUZZLE_IDS,
   grantSoloReward,
   growthView,
   matchJourney,
@@ -32,6 +31,7 @@ import { MatchRegistry } from "./game/match-registry.js";
 import { InMemoryMatchStore, type MatchStore } from "./persistence/match-store.js";
 import { operationalLogFields } from "./observability/operational-logging.js";
 import { GAME_PUZZLES } from "./game/puzzle-catalog.js";
+import { CatalogService, codeCatalog } from "./game/catalog-service.js";
 
 export interface GameServerOptions {
   webOrigin?: string | RegExp;
@@ -48,6 +48,8 @@ export interface GameServerOptions {
   guestSessionCleanupIntervalMs?: number;
   matchStore?: MatchStore;
   puzzles?: readonly MatchPuzzle[];
+  /** DB 카탈로그 등 외부에서 만든 카탈로그. 없으면 puzzles(또는 코드 카탈로그)로 만든다. */
+  catalog?: CatalogService;
   /** 통합 테스트 등에서 특정 장면으로 매칭을 고정한다. */
   sceneId?: string;
 }
@@ -106,7 +108,8 @@ type GameSocket = Socket<
 >;
 
 export async function createGameServer(options: GameServerOptions): Promise<FastifyInstance> {
-  const catalog = options.puzzles ?? GAME_PUZZLES;
+  const catalogService = options.catalog ?? new CatalogService(codeCatalog(options.puzzles ?? GAME_PUZZLES));
+  const catalog = catalogService.catalog.battle;
   if (!catalog.length) throw new Error("Puzzle catalog is empty.");
   const requestedPuzzle = options.sceneId ? catalog.find((puzzle) => puzzle.id === options.sceneId) : undefined;
   if (options.puzzles && options.sceneId && !requestedPuzzle) throw new Error("Requested scene is absent from the active catalog.");
@@ -121,6 +124,12 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
     });
   }
   const matchStore = options.matchStore ?? new InMemoryMatchStore();
+  app.get("/catalog", async (_request, reply) => {
+    const current = await catalogService.fresh();
+    reply.header("Cache-Control", "public, max-age=60");
+    return { puzzles: current.cards };
+  });
+
   app.get("/health", async (_request, reply) => {
     const database = await matchStore.health();
     if (!database) reply.code(503);
@@ -135,7 +144,8 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
   >(app.server, {
     cors: options.webOrigin ? { origin: options.webOrigin } : undefined,
   });
-  const registry = new MatchRegistry(requestedPuzzle ? [requestedPuzzle] : options.puzzles);
+  const registry = new MatchRegistry(requestedPuzzle ? [requestedPuzzle] : catalog);
+  const deckFor = (match: GameMatch) => catalogService.deckCards(match.serialize().puzzles);
   const guestSessionRetentionMs = options.guestSessionRetentionMs ?? 7 * 24 * 60 * 60 * 1_000;
   const guestSessionCleanupIntervalMs = options.guestSessionCleanupIntervalMs ?? 60 * 1_000;
   const sessions = new GuestSessionRegistry(guestSessionRetentionMs);
@@ -376,6 +386,7 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
       playerId: session.playerId,
       opponentNickname: opponent?.nickname ?? "상대",
       opponentCosmetics: opponentCosmetics(opponent?.playerId),
+      deck: deckFor(match),
     });
     emitSnapshots(match);
   }
@@ -520,19 +531,24 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
         const match = registry.create(matchId, [
           { playerId: waitingPlayer.playerId, nickname: waitingPlayer.nickname },
           { playerId: session.playerId, nickname: normalizedNickname },
-        ], settings);
+        ], settings, requestedPuzzle ? [structuredClone(requestedPuzzle)] : catalogService.pickDeck());
+        // 다음 경기를 위해 오래된 카탈로그를 백그라운드에서 다시 읽는다.
+        void catalogService.fresh();
+        const deck = deckFor(match);
 
         socket.emit("match:found", {
           matchId,
           playerId: session.playerId,
           opponentNickname: waitingPlayer.nickname,
           opponentCosmetics: opponentCosmetics(waitingPlayer.playerId),
+          deck,
         });
         opponentSocket.emit("match:found", {
           matchId,
           playerId: waitingPlayer.playerId,
           opponentNickname: normalizedNickname,
           opponentCosmetics: opponentCosmetics(session.playerId),
+          deck,
         });
         emitSnapshots(match);
         waitingPlayers.delete(key);
@@ -669,7 +685,7 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
         }
         enforceCooldown("solo");
         const before = growthOf(session.playerId);
-        const soloId = (SOLO_PUZZLE_IDS as readonly string[]).includes(input.puzzleId) ? input.puzzleId : undefined;
+        const soloId = catalogService.isSoloPuzzle(input.puzzleId) ? input.puzzleId : undefined;
         const result = grantSoloReward(before, input.elapsedMs, Date.now(), soloId);
         if (result.progress !== before) storeGrowth(session.playerId, result.progress);
         socket.emit("player:growth", growthPayload(session.playerId, {

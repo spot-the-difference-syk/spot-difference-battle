@@ -8,6 +8,7 @@ import type {
 import type { PublicCosmetics } from "../game/cosmetics.js";
 import type { PlayerGrowthPayload } from "../game/progression.js";
 import type { GamePuzzleId } from "../puzzles/asset-manifest.js";
+import type { PuzzleCard } from "../puzzles/catalog.js";
 
 export interface MatchFoundPayload {
   matchId: string;
@@ -15,6 +16,8 @@ export interface MatchFoundPayload {
   opponentNickname: string;
   /** 상대의 프로필 테두리와 칭호 */
   opponentCosmetics?: PublicCosmetics;
+  /** 이 경기에서 풀 그림들의 공개 정보(정답 제외). 이미지 주소를 여기서 얻는다. */
+  deck?: PuzzleCard[];
 }
 
 export interface SessionReadyPayload {

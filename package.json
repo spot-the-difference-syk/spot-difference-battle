@@ -24,10 +24,12 @@
     "e2e": "playwright test",
     "e2e:install": "playwright install chromium firefox webkit",
     "r2:canary": "node scripts/r2-canary.mjs",
+    "puzzle": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/puzzle-publish.mjs",
     "setup": "pnpm install && pnpm build:packages",
     "pretest": "pnpm build:packages",
-    "test": "pnpm test:r2-delivery && pnpm -r --if-present test",
+    "test": "pnpm test:r2-delivery && pnpm test:scripts && pnpm -r --if-present test",
     "test:r2-delivery": "node --test workers/r2-delivery/test/index.test.mjs",
+    "test:scripts": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test scripts/r2-canary.test.mjs scripts/puzzle-publish.test.mjs",
     "build:android:web": "pnpm --filter @spot-battle/web build",
     "copy:android:web": "node scripts/copy-android-web.mjs",
     "package:android:web": "pnpm build:android:web && pnpm copy:android:web"
@@ -35,6 +37,8 @@
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1131.0",
     "@playwright/test": "^1.61.1",
+    "pg": "^8.22.0",
+    "sharp": "0.34.4",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
     "wrangler": "4.134.0"
