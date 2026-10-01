@@ -11,7 +11,6 @@ import { resolveWebOrigin } from "./config/web-origin.js";
 const host = process.env.HOST ?? "0.0.0.0";
 const port = Number.parseInt(process.env.PORT ?? "3001", 10);
 const webOrigin = resolveWebOrigin(process.env.WEB_ORIGIN, process.env.NODE_ENV);
-const staticRoot = process.env.WEB_ROOT?.trim() || undefined;
 const configuredSceneId = process.env.GAME_SCENE_ID?.trim();
 const catalogSource = resolvePuzzleCatalogSource(process.env.PUZZLE_CATALOG_SOURCE);
 if (
@@ -41,7 +40,6 @@ const matchStore = storeKind === "postgres"
   : new InMemoryMatchStore();
 const app = await createGameServer({
   webOrigin,
-  staticRoot,
   matchStore,
   sceneId: configuredSceneId,
   catalog,

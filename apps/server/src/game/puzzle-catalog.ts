@@ -94,10 +94,8 @@ export const GAME_PUZZLES: readonly MatchPuzzle[] = [
   },
 ] as const;
 
-export const ACTIVE_GAME_PUZZLES: readonly MatchPuzzle[] = GAME_PUZZLES;
-
 export function shuffledGamePuzzles(): MatchPuzzle[] {
-  return [...ACTIVE_GAME_PUZZLES]
+  return [...GAME_PUZZLES]
     .map((puzzle) => ({ puzzle, order: Math.random() }))
     .sort((left, right) => left.order - right.order)
     .map(({ puzzle }) => structuredClone(puzzle));

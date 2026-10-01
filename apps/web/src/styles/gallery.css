@@ -472,23 +472,6 @@ body {
   font-weight: 600;
 }
 
-.found-dots {
-  display: inline-flex;
-  gap: 6px;
-}
-
-.found-dots i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgb(255 255 255 / 0.2);
-  transition: background 0.3s;
-}
-
-.found-dots i.on {
-  background: #fff;
-}
-
 .zoom-controls {
   display: inline-flex;
   align-items: center;

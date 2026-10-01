@@ -135,4 +135,4 @@ export async function handleRequest(request, env, options = {}) {
 }
 
 export default { fetch: handleRequest };
-export { createLogger, PATH_PATTERN };
+export { createLogger };
