@@ -1,5 +1,6 @@
 import { GameMatch } from "@spot-battle/game-core";
-import { loadDatabasePuzzles } from "../../../apps/server/src/persistence/puzzle-catalog.js";
+import { loadDatabaseCatalog } from "../../../apps/server/src/persistence/puzzle-catalog.js";
+import { CatalogService } from "../../../apps/server/src/game/catalog-service.js";
 import { SupabasePostgresMatchStore } from "../../../apps/server/src/persistence/match-store.js";
 import { RealtimeGame, type Archive, type Peer, type Storage } from "./game.js";
 
@@ -18,6 +19,8 @@ interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
   ALLOWED_ORIGINS?: string;
   PUZZLE_CATALOG_SOURCE?: string;
+  /** R2 이미지 전달 Worker 주소. database 카탈로그에서 그림 URL을 만든다. */
+  PUZZLE_ASSET_BASE_URL?: string;
   HYPERDRIVE?: { connectionString: string };
 }
 declare const WebSocketPair: { new(): { 0: GameWebSocket; 1: GameWebSocket } };
@@ -35,6 +38,12 @@ export function allowedOrigin(request: Request, env: Pick<Env, "ALLOWED_ORIGINS"
   return !!origin && (env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).includes(origin);
 }
 
+/** 앱인토스처럼 다른 주소에서 열린 웹이 카탈로그를 읽을 수 있게 허용된 Origin에만 CORS를 연다. */
+function corsHeaders(request: Request, env: Pick<Env, "ALLOWED_ORIGINS">): Record<string, string> {
+  const origin = request.headers.get("Origin");
+  return origin && allowedOrigin(request, env) ? { "Access-Control-Allow-Origin": origin, Vary: "Origin" } : {};
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const path = new URL(request.url).pathname;
@@ -44,6 +53,13 @@ export default {
       return env.GAME_LOBBY.get(env.GAME_LOBBY.idFromName("mvp-v1")).fetch(request);
     }
     if (path === "/health") return env.GAME_LOBBY.get(env.GAME_LOBBY.idFromName("mvp-v1")).fetch(request);
+    if (path === "/catalog") {
+      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(request, env) });
+      const response = await env.GAME_LOBBY.get(env.GAME_LOBBY.idFromName("mvp-v1")).fetch(request);
+      const headers = new Headers(response.headers);
+      for (const [key, value] of Object.entries(corsHeaders(request, env))) headers.set(key, value);
+      return new Response(response.body, { status: response.status, headers });
+    }
     return env.ASSETS.fetch(request);
   },
 };
@@ -56,7 +72,16 @@ export class GameLobby {
       const source = env.PUZZLE_CATALOG_SOURCE ?? "code";
       if (source !== "code" && source !== "database") throw new Error("Invalid puzzle catalog source.");
       if (source === "database" && !env.HYPERDRIVE) throw new Error("Database catalog requires HYPERDRIVE.");
-      const catalog = source === "database" ? await loadDatabasePuzzles(env.HYPERDRIVE!.connectionString) : undefined;
+      let catalog: CatalogService | undefined;
+      if (source === "database") {
+        const assetBaseUrl = env.PUZZLE_ASSET_BASE_URL?.trim();
+        if (!assetBaseUrl) throw new Error("Database catalog requires PUZZLE_ASSET_BASE_URL.");
+        const load = () => loadDatabaseCatalog(env.HYPERDRIVE!.connectionString, assetBaseUrl);
+        catalog = new CatalogService(await load(), load, {
+          assetBaseUrl,
+          onError: () => console.error(JSON.stringify({ event: "catalog.refresh_failed" })),
+        });
+      }
       const archive: Archive | undefined = env.HYPERDRIVE ? {
         save: async (state) => {
           const store = new SupabasePostgresMatchStore(env.HYPERDRIVE!.connectionString, DATABASE_OPTIONS);
@@ -116,6 +141,9 @@ export class GameLobby {
     return this.ctx.getWebSockets().filter((ws) => ws.readyState === 1).map((ws) => this.peer(ws));
   }
   async fetch(request: Request): Promise<Response> {
+    if (new URL(request.url).pathname === "/catalog") {
+      return Response.json(await this.game.catalogPayload(), { headers: { "Cache-Control": "public, max-age=60" } });
+    }
     if (new URL(request.url).pathname === "/health") {
       const database = await this.databaseHealth();
       return Response.json({ status: database === false ? "degraded" : "ok", runtime: "cloudflare-durable-object", database, catalog: this.env.PUZZLE_CATALOG_SOURCE ?? "code" }, { status: database === false ? 503 : 200, headers: { "Cache-Control": "no-store" } });

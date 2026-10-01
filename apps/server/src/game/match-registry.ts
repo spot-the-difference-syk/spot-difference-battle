@@ -14,8 +14,9 @@ export class MatchRegistry {
     matchId: string,
     players: [{ playerId: string; nickname: string }, { playerId: string; nickname: string }],
     settings?: MatchSettings,
+    deck?: MatchPuzzle[],
   ): GameMatch {
-    const selected = this.puzzles === ACTIVE_GAME_PUZZLES ? shuffledGamePuzzles() : structuredClone(this.puzzles) as MatchPuzzle[];
+    const selected = deck ?? (this.puzzles === ACTIVE_GAME_PUZZLES ? shuffledGamePuzzles() : structuredClone(this.puzzles) as MatchPuzzle[]);
     const match = new GameMatch(matchId, selected, players, undefined, settings);
     this.matches.set(matchId, match);
     for (const player of players) this.playerMatches.set(player.playerId, matchId);

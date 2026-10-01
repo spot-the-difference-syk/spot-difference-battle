@@ -43,7 +43,7 @@ describe("player growth", () => {
   });
 
   it("records stats and collection for every finished match, even a forfeit", () => {
-    const journey = { completedKeys: ["game:cozy-cafe", "game:cyber-city", "game:not-a-puzzle"], found: 7 };
+    const journey = { completedKeys: ["game:cozy-cafe", "game:cyber-city", "game:Not A Puzzle"], found: 7 };
     const forfeited = settleMatch(emptyGrowth(), "m1", finished("a", "FORFEIT"), "b", journey)!;
     expect(forfeited.reward).toBeNull();
     expect(forfeited.progress).toMatchObject({ totalXp: 0, coins: 0, stats: { matches: 1, losses: 1, differencesFound: 7 }, collected: ["game:cozy-cafe", "game:cyber-city"] });

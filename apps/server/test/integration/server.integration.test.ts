@@ -1,6 +1,6 @@
 import { GameMatch } from "@spot-battle/game-core";
 import { GAME_PUZZLES } from "../../src/game/puzzle-catalog.js";
-import type { ClientToServerEvents, GameErrorPayload, GameSnapshot, MatchFoundPayload, PlayerGrowthPayload, ServerToClientEvents } from "@spot-battle/shared";
+import type { CatalogPayload, ClientToServerEvents, GameErrorPayload, GameSnapshot, MatchFoundPayload, PlayerGrowthPayload, ServerToClientEvents } from "@spot-battle/shared";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { io as createClient, type Socket } from "socket.io-client";
@@ -161,6 +161,21 @@ describe("simultaneous game server", () => {
     await expect(winnerReward).resolves.toMatchObject({ matchId: firstMatch.matchId, reward: { reason: "WIN", xp: 100, coins: 120, leveledUp: true }, progress: { level: 2, coins: 120 } });
     await expect(loserReward).resolves.toMatchObject({ reward: { reason: "LOSS", xp: 40, coins: 30 }, progress: { level: 1, levelXp: 40 } });
   }, 15_000);
+
+  it("serves the public catalog and sends the match deck", async () => {
+    const { port } = app.server.address() as AddressInfo;
+    const response = await fetch(`http://127.0.0.1:${port}/catalog`);
+    expect(response.status).toBe(200);
+    const catalog = await response.json() as CatalogPayload;
+    expect(catalog.puzzles.find((card) => card.id === "enchanted-forest")).toMatchObject({ mode: "battle", title: "마법의 버섯 숲" });
+    expect(JSON.stringify(catalog.puzzles.filter((card) => card.mode === "battle"))).not.toContain("regions");
+    const first = await connect();
+    const second = await connect();
+    const found = waitForEvent<MatchFoundPayload>(first, "match:found");
+    first.emit("queue:join", { nickname: "첫째" });
+    second.emit("queue:join", { nickname: "둘째" });
+    expect((await found).deck?.map((card) => card.id)).toEqual(["enchanted-forest"]);
+  });
 
   it("rejects unaffordable or locked cosmetics and shares the opponent's public cosmetics", async () => {
     const first = await connect();

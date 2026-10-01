@@ -1,6 +1,7 @@
 import { GameMatch, GameRuleError, type MatchPuzzle, type PersistedMatchState } from "@spot-battle/game-core";
-import { DEFAULT_MATCH_SETTINGS, GAME_CONFIG, GAME_DIFFICULTIES, GAME_MODES, buyCosmetic, emptyGrowth, equipCosmetic, SOLO_PUZZLE_IDS, grantSoloReward, growthView, matchJourney, settleMatch, normalizeGrowth, publicCosmetics, type MatchSettings, type PlayerGrowth, type PlayerGrowthPayload } from "@spot-battle/shared";
+import { DEFAULT_MATCH_SETTINGS, GAME_CONFIG, GAME_DIFFICULTIES, GAME_MODES, buyCosmetic, emptyGrowth, equipCosmetic, grantSoloReward, growthView, matchJourney, settleMatch, normalizeGrowth, publicCosmetics, type MatchSettings, type PlayerGrowth, type PlayerGrowthPayload } from "@spot-battle/shared";
 import { GAME_PUZZLES } from "../../../apps/server/src/game/puzzle-catalog.js";
+import { CatalogService, codeCatalog } from "../../../apps/server/src/game/catalog-service.js";
 
 export interface Storage {
   get<T>(key: string): Promise<T | undefined>;
@@ -85,14 +86,26 @@ export class RealtimeGame {
   private evicted: string[] = [];
   /** 다음 성장 기록 백업 시각. 백업할 것이 없으면 null */
   private growthDueAt: number | null = null;
+  private readonly catalog: CatalogService;
 
   constructor(
     private storage: Storage,
     private peers: () => Peer[],
-    private catalog: readonly MatchPuzzle[] = GAME_PUZZLES,
+    catalog: readonly MatchPuzzle[] | CatalogService = GAME_PUZZLES,
     private archive?: Archive,
     private now: () => number = Date.now,
-  ) {}
+  ) {
+    this.catalog = catalog instanceof CatalogService ? catalog : new CatalogService(codeCatalog(catalog));
+  }
+
+  /** 브라우저에 공개하는 활성 퍼즐 목록(대결 정답 제외) */
+  async catalogPayload() {
+    return { puzzles: (await this.catalog.fresh()).cards };
+  }
+
+  private deckFor(match: GameMatch) {
+    return this.catalog.deckCards(match.serialize().puzzles);
+  }
 
   async restore(): Promise<void> {
     this.sessions = new Map([...await this.storage.list<Session>({ prefix: "session:" })].map(([, s]) => [s.playerId, s]));
@@ -187,7 +200,7 @@ export class RealtimeGame {
     if (live) {
       live.match.setConnectionStatus(active.playerId, "CONNECTED");
       const opponent = live.match.snapshot(active.playerId).players.find((p) => p.playerId !== active.playerId)!;
-      this.emit(peer, "match:found", { matchId: live.match.matchId, playerId: active.playerId, opponentNickname: opponent.nickname, opponentCosmetics: this.cosmeticsOf(opponent.playerId) });
+      this.emit(peer, "match:found", { matchId: live.match.matchId, playerId: active.playerId, opponentNickname: opponent.nickname, opponentCosmetics: this.cosmeticsOf(opponent.playerId), deck: this.deckFor(live.match) });
       this.broadcast(live.match);
     }
     await this.checkpoint();
@@ -211,6 +224,7 @@ export class RealtimeGame {
           live.retiredPlayers = [...(live.retiredPlayers ?? []), peer.playerId];
         }
       } else if (event === "queue:join") {
+        await this.catalog.fresh();
         this.join(peer, session, object(payload));
       } else if (event === "shop:buy" || event === "shop:equip") {
         const itemId = string(object(payload), "itemId");
@@ -224,7 +238,7 @@ export class RealtimeGame {
         const input = object(payload);
         if (typeof input.puzzleId !== "string" || typeof input.elapsedMs !== "number") throw new GameRuleError("INVALID_PAYLOAD", "솔로 기록 형식이 올바르지 않습니다.");
         const before = this.growthOf(session);
-        const soloId = (SOLO_PUZZLE_IDS as readonly string[]).includes(input.puzzleId) ? input.puzzleId : undefined;
+        const soloId = this.catalog.isSoloPuzzle(input.puzzleId) ? input.puzzleId : undefined;
         const result = grantSoloReward(before, input.elapsedMs, this.now(), soloId);
         if (result.progress !== before) this.setGrowth(session, result.progress);
         this.emit(peer, "player:growth", this.growthPayload(session, {
@@ -296,16 +310,12 @@ export class RealtimeGame {
       return;
     }
     if ([...this.matches.values()].filter((m) => !terminal(m.match)).length >= MAX_MATCHES) throw new GameRuleError("SERVER_BUSY", "잠시 후 다시 시도해주세요.");
-    const puzzles = [...this.catalog];
-    for (let i = puzzles.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [puzzles[i], puzzles[j]] = [puzzles[j]!, puzzles[i]!];
-    }
+    const puzzles = this.catalog.pickDeck();
     const match = new GameMatch(crypto.randomUUID(), puzzles, [{ playerId: waiting.playerId, nickname: waiting.nickname }, { playerId: session.playerId, nickname }], this.now(), settings);
     this.matches.set(match.matchId, { match, finishedAt: null, archived: false });
     this.waiting.delete(key);
     for (const [target, name, opponentId] of [[peer, waiting.nickname, waiting.playerId], [opponent, nickname, session.playerId]] as const) {
-      this.emit(target, "match:found", { matchId: match.matchId, playerId: target.playerId, opponentNickname: name, opponentCosmetics: this.cosmeticsOf(opponentId) });
+      this.emit(target, "match:found", { matchId: match.matchId, playerId: target.playerId, opponentNickname: name, opponentCosmetics: this.cosmeticsOf(opponentId), deck: this.deckFor(match) });
     }
     this.broadcast(match);
   }

@@ -5,6 +5,8 @@ export const GAME_CONFIG = {
   readyTimeoutSeconds: 30,
   preloadTimeoutSeconds: 15,
   reconnectGraceSeconds: 10,
+  /** 한 경기에 쓰는 그림 수. 카탈로그가 더 크면 무작위로 이만큼 고른다. */
+  puzzlesPerMatch: 10,
 } as const;
 
 export const GAME_MODES = ["STANDARD", "SPRINT", "SURVIVAL"] as const;

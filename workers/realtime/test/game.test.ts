@@ -216,6 +216,16 @@ describe("Cloudflare authoritative game", () => {
     const found = opponent.frames.find((f) => f.event === "match:found")!.payload as MatchFoundPayload;
     expect(found.opponentCosmetics).toEqual({ profile: "profile-sage", title: "title-visitor" });
   });
+  it("publishes the catalog without battle answers and sends each match its deck", async () => {
+    const h = await harness();
+    const payload = await h.game.catalogPayload();
+    expect(payload.puzzles.some((card) => card.mode === "solo" && card.answers?.length === 5)).toBe(true);
+    expect(payload.puzzles.filter((card) => card.mode === "battle").every((card) => card.answers === undefined)).toBe(true);
+    const { first } = await h.start();
+    const found = first.frames.find((f) => f.event === "match:found")!.payload as MatchFoundPayload;
+    expect(found.deck?.map((card) => card.id)).toEqual([GAME_PUZZLES[0]!.id]);
+    expect(found.deck?.[0]).toMatchObject({ version: GAME_PUZZLES[0]!.assetVersion, mode: "battle" });
+  });
   it("stamps snapshots with the server clock", async () => {
     const h = await harness(); const { first } = await h.start();
     expect(typeof h.snapshot(first).serverNowMs).toBe("number");
