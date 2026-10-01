@@ -26,6 +26,12 @@ const SERVER_URL = resolveServerUrl(
   window.location.href,
 );
 const NICKNAME_KEY = "spot-battle.nickname";
+/** Errors that mean the queue request was rejected, so the matching screen must close. */
+const QUEUE_REJECTION_CODES = new Set(["ALREADY_IN_MATCH", "INVALID_NICKNAME", "INVALID_SETTINGS", "SERVER_BUSY"]);
+/** Errors the UI already explains (lock badge, throttling) and that should not raise a toast. */
+const SILENT_ERROR_CODES = new Set(["INPUT_RATE_LIMITED", "INPUT_LOCKED"]);
+/** Slightly above the server's 120ms guess interval so double taps never hit the server limit. */
+const CLIENT_GUESS_INTERVAL_MS = 150;
 const GUEST_TOKEN_KEY = "spot-battle.guest-token";
 
 function readStorage(key: string): string | null {
@@ -57,6 +63,11 @@ export function useGameClient() {
   const [foundMarks, setFoundMarks] = useState<FoundMark[]>([]);
   const [error, setError] = useState<GameErrorPayload | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
+  const [clockOffsetMs, setClockOffsetMs] = useState(0);
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  const dismissedRef = useRef(new Set<string>());
+  const lastGuessAtRef = useRef(0);
 
   useEffect(() => {
     const socket = createGameConnection(SERVER_URL, readStorage(GUEST_TOKEN_KEY), import.meta.env.VITE_GAME_TRANSPORT);
@@ -68,6 +79,11 @@ export function useGameClient() {
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
     socket.on("match:found", (payload) => {
+      // The server may resume a finished match whose dismissal never reached it while offline.
+      if (dismissedRef.current.has(payload.matchId)) {
+        socket.emit("game:dismiss", { matchId: payload.matchId });
+        return;
+      }
       snapshotRef.current = null;
       setMatch(payload);
       setSnapshot(null);
@@ -77,6 +93,9 @@ export function useGameClient() {
       setPhase("IN_GAME");
     });
     socket.on("game:snapshot", (next) => {
+      if (dismissedRef.current.has(next.matchId)) return;
+      // Server deadlines are absolute; correct for the device clock (network delay makes this slightly conservative).
+      if (typeof next.serverNowMs === "number") setClockOffsetMs(next.serverNowMs - Date.now());
       if (!shouldAcceptGameSnapshot(snapshotRef.current, next)) return;
       const puzzleChanged = snapshotRef.current?.currentPuzzleId !== next.currentPuzzleId;
       snapshotRef.current = next;
@@ -94,7 +113,11 @@ export function useGameClient() {
           : [...current, { differenceId, region }]);
       }
     });
-    socket.on("game:error", setError);
+    socket.on("game:error", (payload) => {
+      if (QUEUE_REJECTION_CODES.has(payload.code) && phaseRef.current === "MATCHING") setPhase("LOBBY");
+      if (SILENT_ERROR_CODES.has(payload.code)) return;
+      setError(payload);
+    });
     socket.on("game:report-result", ({ reportId: id }) => setReportId(id));
     socket.on("queue:left", () => setPhase("LOBBY"));
     return () => { socket.disconnect(); socketRef.current = null; };
@@ -107,6 +130,8 @@ export function useGameClient() {
   return {
     connected,
     phase,
+    /** Current time on the server clock. Use for every comparison against server deadlines. */
+    serverNow: () => Date.now() + clockOffsetMs,
     nickname,
     match,
     snapshot,
@@ -132,7 +157,10 @@ export function useGameClient() {
       setError(null); setSnapshot(null); setMatch(null); setPhase("MATCHING");
       socketRef.current?.emit("queue:join", { nickname, settings });
     },
-    cancelMatching: () => socketRef.current?.emit("queue:leave"),
+    cancelMatching: () => {
+      socketRef.current?.emit("queue:leave");
+      setPhase("LOBBY");
+    },
     ready: () => match && socketRef.current?.emit("game:ready", { matchId: match.matchId }),
     loaded: (puzzleId: GamePuzzleId) => match && socketRef.current?.emit("game:loaded", {
       matchId: match.matchId,
@@ -140,6 +168,9 @@ export function useGameClient() {
       puzzleVersion: GAME_PUZZLE_ASSET_MANIFEST[puzzleId].version,
     }),
     guess: (puzzleId: GamePuzzleId, point: NormalizedPoint) => {
+      const now = Date.now();
+      if (now - lastGuessAtRef.current < CLIENT_GUESS_INTERVAL_MS) return;
+      lastGuessAtRef.current = now;
       const context = actionContext();
       if (match && context) socketRef.current?.emit("game:guess", { matchId: match.matchId, puzzleId, point, ...context });
     },
@@ -152,6 +183,10 @@ export function useGameClient() {
       if (match && context) socketRef.current?.emit("game:report", { matchId: match.matchId, reason, details, ...context });
     },
     returnToLobby: () => {
+      if (match) {
+        dismissedRef.current.add(match.matchId);
+        socketRef.current?.emit("game:dismiss", { matchId: match.matchId });
+      }
       snapshotRef.current = null; setMatch(null); setSnapshot(null); setFoundMarks([]); setReportId(null); setPhase("LOBBY");
     },
   };

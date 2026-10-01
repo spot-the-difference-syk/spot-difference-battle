@@ -102,7 +102,7 @@ describe("simultaneous game server", () => {
     await persistenceError;
     expect(store.reports.size).toBe(0);
   });
-  it("keeps a cleared player waiting until timeout or forfeit", async () => {
+  it("finishes the match as soon as one player clears every puzzle", async () => {
     const first = await connect();
     const second = await connect();
     const firstFound = waitForEvent<MatchFoundPayload>(first, "match:found");
@@ -147,23 +147,15 @@ describe("simultaneous game server", () => {
     expect(secondProgress.foundMarks).toHaveLength(1);
     expect(firstPlaying.foundMarks).toHaveLength(0);
 
-    const exhaustedFirst = waitForEvent<GameSnapshot>(first, "game:snapshot", (snapshot) => snapshot.state === "PLAYING" && snapshot.currentPuzzleId === null);
+    const finishedFirst = waitForState(first, "FINISHED");
+    const finishedSecond = waitForState(second, "FINISHED");
     for (const point of [{ x: 0.31, y: 0.33 }, { x: 0.27, y: 0.78 }, { x: 0.79, y: 0.17 }]) {
       first.emit("game:guess", { matchId: firstMatch.matchId, puzzleId: "enchanted-forest", point, ...context });
     }
-    const stillPlaying = await exhaustedFirst;
-    expect(stillPlaying).toMatchObject({ state: "PLAYING", currentPuzzleId: null, winnerId: null });
-
-    const finishedFirst = waitForState(first, "FINISHED");
-    const finishedSecond = waitForState(second, "FINISHED");
-    second.emit("game:forfeit", {
-      matchId: firstMatch.matchId,
-      expectedState: "PLAYING",
-      expectedStateVersion: stillPlaying.stateVersion,
-    });
     const [firstResult, secondResult] = await Promise.all([finishedFirst, finishedSecond]);
-    expect(firstResult).toMatchObject({ winnerId: firstMatch.playerId, endReason: "FORFEIT" });
-    expect(secondResult.winnerId).toBe(firstMatch.playerId);
+    expect(firstResult).toMatchObject({ winnerId: firstMatch.playerId, endReason: "COMPLETED" });
+    expect(secondResult).toMatchObject({ winnerId: firstMatch.playerId, endReason: "COMPLETED" });
+    expect(typeof firstResult.serverNowMs).toBe("number");
   }, 15_000);
 
   it("keeps private progress scoped to each client and emits one authoritative result", async () => {

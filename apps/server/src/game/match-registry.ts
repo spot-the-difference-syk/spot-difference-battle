@@ -42,6 +42,13 @@ export class MatchRegistry {
     return matchId ? this.matches.get(matchId) ?? null : null;
   }
 
+  /** Stops resuming a finished match for a player who closed its result screen. */
+  release(matchId: string, playerId: string): void {
+    const match = this.matches.get(matchId);
+    if (!match || !match.isTerminal || this.playerMatches.get(playerId) !== matchId) return;
+    this.playerMatches.delete(playerId);
+  }
+
   remove(matchId: string): boolean {
     const match = this.matches.get(matchId);
     if (!match) return false;

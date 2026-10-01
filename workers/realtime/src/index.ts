@@ -23,6 +23,7 @@ interface Env {
 declare const WebSocketPair: { new(): { 0: GameWebSocket; 1: GameWebSocket } };
 const MAX_CONNECTIONS = 200;
 const MAX_FRAME = 4096;
+const HEALTH_CACHE_MS = 15_000;
 const DATABASE_OPTIONS = { connectionTimeoutMillis: 3000, query_timeout: 3000, max: 1 };
 
 export function allowedOrigin(request: Request, env: Pick<Env, "ALLOWED_ORIGINS">): boolean {
@@ -75,6 +76,22 @@ export class GameLobby {
     });
   }
 
+  private healthCache: { checkedAt: number; pending: Promise<boolean | null> } | null = null;
+
+  /** Public endpoint: reuse one DB probe for a short window so polling cannot open a connection per request. */
+  private databaseHealth(): Promise<boolean | null> {
+    if (!this.env.HYPERDRIVE) return Promise.resolve(null);
+    const now = Date.now();
+    if (this.healthCache && now - this.healthCache.checkedAt < HEALTH_CACHE_MS) return this.healthCache.pending;
+    const connectionString = this.env.HYPERDRIVE.connectionString;
+    const pending = (async () => {
+      const store = new SupabasePostgresMatchStore(connectionString, DATABASE_OPTIONS);
+      try { return await store.health(); } catch { return false; } finally { await store.close().catch(() => undefined); }
+    })();
+    this.healthCache = { checkedAt: now, pending };
+    return pending;
+  }
+
   private peer(ws: GameWebSocket): Peer {
     const attachment = ws.deserializeAttachment();
     return {
@@ -90,11 +107,7 @@ export class GameLobby {
   }
   async fetch(request: Request): Promise<Response> {
     if (new URL(request.url).pathname === "/health") {
-      let database: boolean | null = null;
-      if (this.env.HYPERDRIVE) {
-        const store = new SupabasePostgresMatchStore(this.env.HYPERDRIVE.connectionString, DATABASE_OPTIONS);
-        try { database = await store.health(); } finally { await store.close(); }
-      }
+      const database = await this.databaseHealth();
       return Response.json({ status: database === false ? "degraded" : "ok", runtime: "cloudflare-durable-object", database, catalog: this.env.PUZZLE_CATALOG_SOURCE ?? "code" }, { status: database === false ? 503 : 200, headers: { "Cache-Control": "no-store" } });
     }
     if (this.ctx.getWebSockets().length >= MAX_CONNECTIONS) return new Response("Lobby full", { status: 503 });

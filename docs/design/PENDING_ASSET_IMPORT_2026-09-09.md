@@ -1,6 +1,8 @@
 # Pending puzzle asset import — 2026-09-09
 
-> Status: REVIEW_REQUIRED
+> Status: REMOVED (2026-10-01)
+>
+> 미사용 후보 96장은 저장소에서 삭제했다. 원본은 `C:\Users\dbrud\SpotTheDifference_Assets`에 있으며, 활성화할 때는 아래 기준을 통과한 세트만 다시 추가한다. 실제 작품·캐릭터명이 들어간 세트(`tintin` 등)는 저작권·상표 검토 없이 추가하지 않는다.
 
 ## Import result
 
