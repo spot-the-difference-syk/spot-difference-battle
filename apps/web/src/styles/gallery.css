@@ -1501,9 +1501,13 @@ html {
   transform: scale(0.98);
 }
 
-/* 게임판: 찾은 표시와 어울리는 금색 뷰파인더 */
+/* 게임판: 착용한 정답 표시를 따라간다. 기본은 흰 뷰파인더, 금빛 뷰파인더를 착용하면 금색. */
 .board-find {
   cursor: url('../assets/cursors/find.svg') 16 16, crosshair;
+}
+
+.board-find.board-find-gold {
+  cursor: url('../assets/cursors/find-gold.svg') 16 16, crosshair;
 }
 
 /* 확대한 원본 그림은 끌어서 옮긴다. */
