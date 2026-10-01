@@ -1,98 +1,90 @@
-# Spot Difference Battle — 틀린그림 갤러리
+# 틀린그림 갤러리 (Spot Difference Battle)
 
-> 문서 상태: CURRENT
-> 기준일: 2026-10-01
-> 게임 규칙의 유일한 Markdown 정본은 [`docs/GAME_RULES.md`](docs/GAME_RULES.md)다.
+> 문서 상태: CURRENT · 기준일 2026-10-01 · 게임 규칙의 정본은 [`docs/GAME_RULES.md`](docs/GAME_RULES.md)
 
-같은 그림 두 장에서 다른 곳을 찾는 게임이다. 웹·앱인토스·Android·iOS로 제공한다.
+같은 그림 두 장에서 다른 곳을 찾는 게임입니다. 하나의 웹 코드로 **웹 · 앱인토스 · Android · iOS**를 만듭니다.
 
-- **1대1 대결**: 두 사람이 같은 순서의 그림 10점을 동시에 푼다. 그림마다 차이 3개를 찾으면 각자 다음 그림으로 넘어가고, 전체를 먼저 끝낸 사람이 즉시 이긴다. 시간이 끝나면 점수·오답 순으로 판정한다.
-- **혼자하기(솔로 타임어택)**: 어려운 차이 5개를 찾는 시간을 줄인다. 퍼즐별 최고 기록은 기기에 저장한다.
-- **성장**: 대결·솔로 보상으로 레벨·코인을 얻고, 코인으로 꾸미기 아이템을 산다. 끝까지 푼 그림은 "내 갤러리"에 수집되고 오늘의 목표가 있다. 보상은 항상 서버가 계산한다.
+## 게임 소개
 
-## 운영 구조
-
-| 구성 | 역할 |
+| 모드 | 내용 |
 |---|---|
-| Cloudflare Worker + Durable Object (`workers/realtime`) | **운영 서버.** 웹 정적 파일, 실시간 대결(`/ws`), 그림 목록(`/catalog`), 성장 기록 |
-| R2 + 전달 Worker (`workers/r2-delivery`) | 그림 이미지 저장·제공 |
-| Supabase (Hyperdrive로 연결) | 그림 목록·정답(`puzzle_catalog`), 경기 기록, 신고, 성장 기록 백업 |
-| Node 서버 (`apps/server`) | **로컬 개발·자동 테스트 전용.** 운영에 배포하지 않는다 |
+| **1대1 대결** | 두 사람이 같은 순서의 그림 10점을 동시에 풉니다. 차이 3개를 찾으면 다음 그림으로 넘어가고, 전체를 먼저 끝낸 사람이 바로 이깁니다. |
+| **혼자 하기** | 어려운 차이 5개를 찾는 타임어택입니다. 그림별 최고 기록이 남습니다. |
+| **성장** | 레벨·코인·꾸미기·수집("내 갤러리")·오늘의 목표. 보상은 항상 서버가 계산합니다. |
 
-main에 머지하면 Cloudflare가 자동으로 다시 배포한다. 자세한 내용은 [Cloudflare 배포](docs/CLOUDFLARE_DEPLOYMENT.md)를 본다.
+## 빠른 시작
 
-## 저장소 구성
+필요한 것: **Node.js 24+**, **pnpm 11.9.0**
 
-- `apps/web/`: React·Vite 웹 앱(앱인토스·Android 공용), 앱에 들어 있는 기본 그림
-- `apps/server/`: 로컬 개발용 Fastify·Socket.IO 서버, Worker와 공유하는 카탈로그·저장소 코드
-- `apps/android/`: Android WebView 래퍼
-- `apps/ios/`: iOS 앱(Capacitor)
-- `workers/realtime/`: 운영 게임 Worker
-- `workers/r2-delivery/`: R2 이미지 전달 Worker
-- `packages/shared/`: 공유 규칙·타입·통신 계약·성장/꾸미기 규칙
-- `packages/game-core/`: 프레임워크와 분리된 대결 판정
-- `supabase/migrations/`: DB 스키마
-- `scripts/`: 빌드·그림 등록(`pnpm puzzle`)·구조 검사
-- `tests/e2e/`: Playwright 브라우저 테스트
-- `docs/`: 명세·설계·운영 문서, `docs/history/`는 과거 기록
-
-디렉터리 책임과 의존 방향은 [저장소 구조](docs/REPOSITORY_STRUCTURE.md)를 따른다.
-
-## 주요 문서
-
-- 규칙·기획: [게임 규칙](docs/GAME_RULES.md) · [게임 모드](docs/GAME_MODES.md) · [게임 기획](docs/GAME_DESIGN.md) · [결정 기록](docs/MVP_DECISIONS.md)
-- 화면·흐름: [사용자 흐름](docs/USER_FLOW.md) · [화면 명세](docs/SCREEN_SPEC.md) · [UI 구현 기준](docs/design/UI_GUIDELINES.md)
-- 기술: [기술 설계](docs/TECH_SPEC.md) · [게임 상태](docs/GAME_STATE.md) · [DB 설계](docs/DATABASE_DESIGN.md)
-- 운영: [Cloudflare 배포](docs/CLOUDFLARE_DEPLOYMENT.md) · [그림 에셋·등록](docs/GAME_ASSETS.md) · [모바일 앱(Android·iOS)](docs/MOBILE_APPS.md) · [Android 빌드 환경](docs/android-build-environment.md)
-- 품질: [테스트 계획](docs/TEST_PLAN.md) · [테스트 구조](docs/TEST_STRUCTURE.md) · [구현 백로그](docs/IMPLEMENTATION_BACKLOG.md)
-- 문서 운영: [문서 운영 기준](docs/DOCUMENTATION.md)
-
-## 로컬 실행
-
-Node.js 24 이상과 pnpm 11.9.0이 필요하다. PostgreSQL은 DB 테스트를 돌릴 때만 필요하다(`docker compose up postgres`).
-
-```powershell
-pnpm setup
-pnpm dev
+```bash
+pnpm setup   # 의존성 설치 + 공유 패키지 빌드
+pnpm dev     # 웹(5173) + 개발 서버(3001) 실행
 ```
 
-- 웹: `http://localhost:5173`
-- 개발 서버 상태: `http://localhost:3001/health`
+`http://localhost:5173`을 브라우저 두 개(또는 시크릿 창)로 열면 혼자서 대결을 시험할 수 있습니다.
+DB 없이 메모리 저장소로 동작하며, 개발 서버 설정은 `.env.example`에 있습니다. PostgreSQL은 DB 테스트를 돌릴 때만 필요합니다(`docker compose up postgres`).
 
-PostgreSQL 없이 실행하면 메모리 저장소를 쓴다. 개발 서버 환경변수는 `.env.example`을 본다.
+<details>
+<summary>같은 Wi-Fi의 휴대폰으로 시험하기</summary>
 
-### 같은 Wi-Fi 휴대폰 테스트
+1. PC와 휴대폰을 같은 Wi-Fi에 연결합니다.
+2. PC에서 `ipconfig`로 IPv4 주소를 확인합니다.
+3. `pnpm dev` 실행 후 휴대폰에서 `http://<PC IPv4>:5173`에 접속합니다.
 
-1. PC와 휴대폰을 같은 Wi-Fi에 연결한다.
-2. PC에서 `ipconfig`로 Wi-Fi IPv4 주소를 확인한다.
-3. `pnpm dev`를 실행하고 휴대폰에서 `http://<PC IPv4>:5173`으로 접속한다.
+개발 웹은 접속한 PC의 3001 포트 서버에 자동으로 연결합니다. 사설망 테스트 전용입니다.
 
-개발 웹은 접속한 PC의 `3001` 포트 서버에 자동 연결한다. 같은 사설망 테스트용이며 인터넷에 공개하지 않는다.
+</details>
 
-### 앱인토스 테스트
+## 자주 쓰는 명령
 
-SDK 3.x 기능은 `pnpm dev`로 띄운 브라우저의 AIT Devtools로 확인한다. 실제 토스 환경용 번들은 운영 Worker에 연결되게 만든다. 서버 주소는 `scripts/production.config.json`에서 읽는다(`VITE_SERVER_URL`로 바꿀 수 있음).
+| 명령 | 하는 일 |
+|---|---|
+| `pnpm dev` | 로컬 개발 실행 |
+| `pnpm check` | 구조·타입 검사 |
+| `pnpm test` | 단위·통합 테스트 |
+| `pnpm e2e` / `pnpm e2e:cloudflare` | 브라우저 테스트(개발 서버 / 로컬 Worker) |
+| `pnpm build:ait:cloudflare` | 토스(앱인토스)에 올릴 번들 |
+| `pnpm build:android` / `pnpm build:ios` | Android·iOS 앱에 웹 번들 넣기 |
+| `pnpm puzzle publish <폴더> --upload --activate` | 새 그림을 R2·DB에 올려 바로 게임에 노출 |
 
-```powershell
-pnpm build:ait:cloudflare
+앱·앱인토스 번들이 접속하는 운영 서버 주소는 `scripts/production.config.json` 한 곳에서 바꿉니다.
+
+## 구조
+
+```mermaid
+flowchart LR
+    Client["웹 · 앱인토스<br/>Android · iOS"] -->|"대결 /ws<br/>그림 목록 /catalog"| Worker["Cloudflare Worker<br/>+ Durable Object"]
+    Client -->|"그림 이미지"| R2["R2 전달 Worker"]
+    Worker -->|"Hyperdrive"| DB[("Supabase<br/>그림 목록 · 경기 기록<br/>성장 기록 백업")]
 ```
 
-### 모바일 앱
+- **운영 서버는 Cloudflare Worker 하나**입니다. main에 머지하면 자동으로 다시 배포됩니다.
+- `apps/server`(Node)는 **로컬 개발·자동 테스트 전용**이며 운영에 배포하지 않습니다.
 
-```powershell
-pnpm build:android   # Android 앱에 웹 번들 넣기 → apps/android 에서 ./gradlew :app:assembleDebug
-pnpm build:ios       # iOS 앱에 웹 번들 넣기 → Mac의 Xcode에서 실행·배포
+```text
+apps/
+  web/          React·Vite 게임(모든 플랫폼 공용)
+  server/       로컬 개발 서버 + Worker와 공유하는 카탈로그·저장소 코드
+  android/      Android WebView 래퍼
+  ios/          iOS 앱(Capacitor)
+workers/
+  realtime/     운영 게임 Worker
+  r2-delivery/  그림 이미지 전달 Worker
+packages/
+  shared/       공유 규칙·타입·통신 계약
+  game-core/    대결 판정 엔진
+supabase/       DB 마이그레이션
+scripts/        빌드 · 그림 등록 도구 · 구조 검사
+tests/e2e/      Playwright 브라우저 테스트
+docs/           명세 · 설계 · 운영 문서(history/는 과거 기록)
 ```
 
-자세한 내용은 [모바일 앱](docs/MOBILE_APPS.md)을 본다.
+## 문서
 
-> `pnpm build:ait`(Cloudflare 없이)는 로컬 Node 서버(Socket.IO)에 연결하는 번들을 만든다. 토스에 올리는 번들은 `build:ait:cloudflare`를 쓴다.
-
-## 검사
-
-```powershell
-pnpm check   # 구조·타입 검사
-pnpm test    # 단위·통합 테스트(그림 등록 도구 포함)
-pnpm e2e     # 브라우저 테스트(Node 개발 서버)
-pnpm e2e:cloudflare   # 브라우저 테스트(로컬 Worker)
-```
+| 분류 | 문서 |
+|---|---|
+| 규칙·기획 | [게임 규칙](docs/GAME_RULES.md) · [모드](docs/GAME_MODES.md) · [기획](docs/GAME_DESIGN.md) · [결정 기록](docs/MVP_DECISIONS.md) |
+| 화면 | [사용자 흐름](docs/USER_FLOW.md) · [화면 명세](docs/SCREEN_SPEC.md) · [UI 구현 기준](docs/design/UI_GUIDELINES.md) |
+| 기술 | [기술 설계](docs/TECH_SPEC.md) · [게임 상태](docs/GAME_STATE.md) · [DB 설계](docs/DATABASE_DESIGN.md) · [저장소 구조](docs/REPOSITORY_STRUCTURE.md) |
+| 운영 | [Cloudflare 배포](docs/CLOUDFLARE_DEPLOYMENT.md) · [그림 등록](docs/GAME_ASSETS.md) · [모바일 앱](docs/MOBILE_APPS.md) · [Android 빌드 환경](docs/android-build-environment.md) |
+| 품질·계획 | [테스트 계획](docs/TEST_PLAN.md) · [테스트 구조](docs/TEST_STRUCTURE.md) · [백로그](docs/IMPLEMENTATION_BACKLOG.md) · [문서 운영 기준](docs/DOCUMENTATION.md) |
