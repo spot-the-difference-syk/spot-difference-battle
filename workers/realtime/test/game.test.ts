@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { GameSnapshot } from "@spot-battle/shared";
+import type { GameSnapshot, PlayerGrowthPayload } from "@spot-battle/shared";
 import { GAME_PUZZLES } from "../../../apps/server/src/game/puzzle-catalog.js";
 import { RealtimeGame, type Archive, type Peer, type Storage } from "../src/game.js";
 import { allowedOrigin } from "../src/index.js";
@@ -157,7 +157,7 @@ describe("Cloudflare authoritative game", () => {
     const token = h.token(first);
     await h.disconnect(first);
     const resumed = await h.add(token);
-    expect(resumed.frames.map((f) => f.event)).toEqual(["session:ready"]);
+    expect(resumed.frames.map((f) => f.event)).toEqual(["session:ready", "player:growth"]);
   });
   it("ignores dismissal of an active match", async () => {
     const h = await harness(); const { first } = await h.start();
@@ -168,6 +168,30 @@ describe("Cloudflare authoritative game", () => {
     const resumed = await h.add(token);
     expect(resumed.frames.some((f) => f.event === "match:found")).toBe(true);
     expect(h.snapshot(resumed).state).toBe("PLAYING");
+  });
+  it("rewards a finished match once and skips the player who forfeited", async () => {
+    const h = await harness(); const { first, second } = await h.start();
+    await h.action(first, "game:forfeit");
+    await h.game.alarm();
+    const growth = (p: TestPeer) => p.frames.filter((f) => f.event === "player:growth").map((f) => f.payload as PlayerGrowthPayload);
+    const winnerRewards = growth(second).filter((g) => g.reward);
+    expect(winnerRewards).toHaveLength(1);
+    expect(winnerRewards[0]!.reward).toMatchObject({ reason: "WIN", xp: 100, coins: 120, leveledUp: true });
+    expect(winnerRewards[0]!.progress).toMatchObject({ level: 2, coins: 120 });
+    expect(growth(first).some((g) => g.reward)).toBe(false);
+    const token = h.token(second);
+    await h.restore();
+    const back = await h.add(token);
+    expect(growth(back).at(-1)!.progress).toMatchObject({ level: 2, totalXp: 100, coins: 120 });
+  });
+  it("rewards solo completions up to the daily limit", async () => {
+    const h = await harness(); const player = await h.add();
+    for (let i = 0; i < 6; i += 1) await h.game.action(player, "solo:complete", { puzzleId: "observatory", elapsedMs: 40_000 });
+    await h.game.action(player, "solo:complete", { puzzleId: "observatory", elapsedMs: 500 });
+    const payloads = player.frames.filter((f) => f.event === "player:growth").map((f) => f.payload as PlayerGrowthPayload);
+    expect(payloads.filter((p) => p.reward)).toHaveLength(5);
+    expect(payloads.at(-2)!.soloLimitReached).toBe(true);
+    expect(payloads.at(-1)!.progress).toMatchObject({ totalXp: 150, coins: 100 });
   });
   it("stamps snapshots with the server clock", async () => {
     const h = await harness(); const { first } = await h.start();

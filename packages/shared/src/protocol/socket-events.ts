@@ -5,6 +5,7 @@ import type {
   GameState,
   NormalizedPoint,
 } from "../game/types.js";
+import type { PlayerGrowthPayload } from "../game/progression.js";
 import type { GamePuzzleId } from "../puzzles/asset-manifest.js";
 
 export interface MatchFoundPayload {
@@ -57,6 +58,8 @@ export interface ServerToClientEvents {
   "game:guess-result": (payload: GuessResult) => void;
   "game:error": (payload: GameErrorPayload) => void;
   "game:report-result": (payload: ReportResultPayload) => void;
+  /** 레벨·코인 동기화. 접속 직후와 보상을 받을 때 보낸다. */
+  "player:growth": (payload: PlayerGrowthPayload) => void;
 }
 
 export interface ClientToServerEvents {
@@ -81,4 +84,6 @@ export interface ClientToServerEvents {
     reason: ReportReason;
     details?: string;
   }) => void;
+  /** 솔로 타임어택 완주. 서버가 하루 한도 안에서 보상한다. */
+  "solo:complete": (payload: { puzzleId: string; elapsedMs: number }) => void;
 }

@@ -49,3 +49,20 @@ export {
   type ServerToClientEvents,
   type SessionReadyPayload,
 } from "./protocol/socket-events.js";
+
+export {
+  PROGRESSION_RULES,
+  emptyGrowth,
+  grantMatchReward,
+  grantSoloReward,
+  growthView,
+  koreanDay,
+  matchRewardReason,
+  normalizeGrowth,
+  xpForLevel,
+  type GrowthView,
+  type PlayerGrowth,
+  type PlayerGrowthPayload,
+  type RewardReason,
+  type RewardSummary,
+} from "./game/progression.js";

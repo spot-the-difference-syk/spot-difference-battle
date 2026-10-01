@@ -910,3 +910,174 @@ body {
   color: var(--gold);
   font-weight: 700;
 }
+
+/* ---------- growth: level, coins, rewards ---------- */
+
+.level-avatar {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+
+.level-ring {
+  position: absolute;
+  inset: -5px;
+  width: calc(100% + 10px);
+  height: calc(100% + 10px);
+  transform: rotate(-90deg);
+}
+
+.level-ring circle {
+  fill: none;
+  stroke-width: 2;
+}
+
+.level-ring .track {
+  stroke: rgb(20 20 20 / 0.1);
+}
+
+.level-ring .fill {
+  stroke: var(--gold);
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.6s;
+}
+
+.profile-text {
+  display: grid;
+  line-height: 1.25;
+}
+
+.profile-level {
+  color: var(--mute);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (max-width: 1023px) {
+  .profile-text {
+    display: none;
+  }
+}
+
+.coin-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.8);
+  backdrop-filter: blur(12px);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.coin-chip i,
+.coin-dot {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f2ddaa, var(--gold) 70%);
+}
+
+.xp-bar {
+  margin-top: 14px;
+}
+
+.xp-track {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgb(20 20 20 / 0.1);
+}
+
+.xp-track i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--ink);
+  transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.xp-label {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  color: var(--mute);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.reward-panel {
+  margin-top: 28px;
+  padding: 20px;
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  text-align: left;
+}
+
+.level-up {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.level-up .eyebrow {
+  color: var(--gold);
+}
+
+.level-up-number {
+  margin-top: 4px;
+  font-size: 64px;
+  font-weight: 200;
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.level-up-number small {
+  margin-right: 6px;
+  color: var(--mute);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.reward-level {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.reward-rows {
+  margin-top: 8px;
+}
+
+.reward-rows .list-row:last-child {
+  box-shadow: none;
+}
+
+.level-badge {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  box-shadow: 0 0 0 2px var(--paper);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+}
+
+@media (min-width: 1024px) {
+  .level-badge {
+    display: none;
+  }
+}

@@ -1,5 +1,5 @@
 import { GameMatch, GameRuleError, type MatchPuzzle, type PersistedMatchState } from "@spot-battle/game-core";
-import { DEFAULT_MATCH_SETTINGS, GAME_CONFIG, GAME_DIFFICULTIES, GAME_MODES, type MatchSettings } from "@spot-battle/shared";
+import { DEFAULT_MATCH_SETTINGS, GAME_CONFIG, GAME_DIFFICULTIES, GAME_MODES, emptyGrowth, grantMatchReward, grantSoloReward, growthView, normalizeGrowth, type MatchSettings, type PlayerGrowth, type PlayerGrowthPayload } from "@spot-battle/shared";
 import { GAME_PUZZLES } from "../../../apps/server/src/game/puzzle-catalog.js";
 
 export interface Storage {
@@ -18,6 +18,8 @@ interface Session {
   lastSeenAt: number;
   reconnectAt: number | null;
   lastGuessAt?: number;
+  /** 레벨·코인. 보상은 이 객체에만 기록해 세션과 함께 저장된다. */
+  growth?: PlayerGrowth;
 }
 interface StoredMatch { state: PersistedMatchState; finishedAt: number | null; archived: boolean; retiredPlayers?: string[] }
 interface LiveMatch { match: GameMatch; finishedAt: number | null; archived: boolean; retiredPlayers?: string[] }
@@ -32,6 +34,8 @@ const RETENTION = 5 * 60_000;
 const SESSION_RETENTION = 7 * 24 * 60 * 60_000;
 /** Sessions that never queued (no nickname) are cheap to recreate, so keep them briefly. */
 const ANONYMOUS_SESSION_RETENTION = 60 * 60_000;
+/** Players with levels or coins are kept much longer than plain guests. */
+const GROWTH_SESSION_RETENTION = 180 * 24 * 60 * 60_000;
 const MAX_SESSIONS = 5_000;
 const MAX_MATCHES = 100;
 /** Bound external database I/O per alarm. */
@@ -130,6 +134,7 @@ export class RealtimeGame {
     peer.playerId = active.playerId;
     active.lastSeenAt = this.now();
     this.emit(peer, "session:ready", { playerId: active.playerId, guestToken: active.guestToken });
+    this.emit(peer, "player:growth", this.growthPayload(active));
     await this.advance();
     active.reconnectAt = null;
     // A finished match the player has not dismissed is shown again (e.g. forfeited while offline).
@@ -162,6 +167,16 @@ export class RealtimeGame {
         }
       } else if (event === "queue:join") {
         this.join(peer, session, object(payload));
+      } else if (event === "solo:complete") {
+        const input = object(payload);
+        if (typeof input.puzzleId !== "string" || typeof input.elapsedMs !== "number") throw new GameRuleError("INVALID_PAYLOAD", "솔로 기록 형식이 올바르지 않습니다.");
+        const before = this.growthOf(session);
+        const result = grantSoloReward(before, input.elapsedMs, this.now());
+        if (result.progress !== before) session.growth = result.progress;
+        this.emit(peer, "player:growth", this.growthPayload(session, {
+          ...(result.reward ? { reward: result.reward } : {}),
+          ...(result.limitReached ? { soloLimitReached: true } : {}),
+        }));
       } else {
         const input = object(payload);
         const live = this.current(peer.playerId);
@@ -313,16 +328,45 @@ export class RealtimeGame {
   }
 
   private sessionRetention(session: Session): number {
+    if ((session.growth?.totalXp ?? 0) > 0) return GROWTH_SESSION_RETENTION;
     return session.nickname === null ? ANONYMOUS_SESSION_RETENTION : SESSION_RETENTION;
+  }
+
+  private growthOf(session: Session): PlayerGrowth {
+    return session.growth ? normalizeGrowth(session.growth) : emptyGrowth();
+  }
+
+  private growthPayload(session: Session, extra: Omit<PlayerGrowthPayload, "progress"> = {}): PlayerGrowthPayload {
+    return { progress: growthView(this.growthOf(session)), ...extra };
+  }
+
+  /** Grants each finished match once; the growth record remembers rewarded match IDs. */
+  private rewardFinished(): void {
+    for (const live of this.matches.values()) {
+      const { match } = live;
+      if (match.currentState !== "FINISHED") continue;
+      const snapshot = match.snapshot();
+      for (const player of snapshot.players) {
+        const session = this.sessions.get(player.playerId);
+        if (!session) continue;
+        const granted = grantMatchReward(this.growthOf(session), match.matchId, snapshot, player.playerId);
+        if (!granted) continue;
+        session.growth = granted.progress;
+        const payload = this.growthPayload(session, { reward: granted.reward, matchId: match.matchId });
+        for (const peer of this.peers()) if (peer.playerId === player.playerId) this.emit(peer, "player:growth", payload);
+      }
+    }
   }
 
   /** Frees the least recently seen offline session that is not in a match. */
   private evictIdleSession(): boolean {
     const activeIds = new Set(this.peers().map((p) => p.playerId));
     let oldest: Session | undefined;
+    const hasGrowth = (session: Session) => (session.growth?.totalXp ?? 0) > 0;
     for (const session of this.sessions.values()) {
       if (activeIds.has(session.playerId) || this.current(session.playerId)) continue;
-      if (!oldest || session.lastSeenAt < oldest.lastSeenAt) oldest = session;
+      // Evict guests without levels before anyone who has earned progress.
+      if (!oldest || (hasGrowth(oldest) && !hasGrowth(session)) || (hasGrowth(oldest) === hasGrowth(session) && session.lastSeenAt < oldest.lastSeenAt)) oldest = session;
     }
     if (!oldest) return false;
     this.sessions.delete(oldest.playerId);
@@ -338,6 +382,7 @@ export class RealtimeGame {
   }
 
   private async checkpoint(): Promise<void> {
+    this.rewardFinished();
     const previous = new Map(this.persisted);
     try {
       if (this.storage.transaction) await this.storage.transaction((storage) => this.persistCheckpoint(storage));

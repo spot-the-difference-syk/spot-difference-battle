@@ -3,6 +3,7 @@ import { Flag, LogOut, WifiOff } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppHeader, BoardPair, PaperScreen, ProgressTrack, RESET_VIEWPORT, Segmented, StageScreen, ZoomControls, type AppTab } from "../features/gallery/components/Gallery";
 import { ArtworkShelf, FeaturedArtwork, featuredArtwork } from "../features/gallery/components/Exhibition";
+import { RewardPanel } from "../features/gallery/components/Growth";
 import { ImageBoard } from "../features/game/components/ImageBoard";
 import { useGameClient } from "../features/game/hooks/use-game-client";
 import { clampViewport, type ImageViewport } from "../features/game/model/image-geometry";
@@ -119,11 +120,11 @@ export default function App() {
     </section>
   </PaperScreen>;
 
-  if (soloActive) return <SoloGame nickname={game.nickname} onTab={switchTab}/>;
+  if (soloActive) return <SoloGame nickname={game.nickname} growth={game.growth} soloResult={game.soloResult} onComplete={game.completeSolo} onTab={switchTab}/>;
 
   if (game.phase === "LOBBY") return <PaperScreen ambientSrc={featured.src}>
     <div className="has-tabbar">
-      <AppHeader nickname={game.nickname} tab="HOME" onTab={switchTab}/>
+      <AppHeader nickname={game.nickname} growth={game.growth} tab="HOME" onTab={switchTab}/>
       <div className="lobby-grid fade-up">
         <div>
           <p className="eyebrow">오늘의 전시</p>
@@ -146,7 +147,7 @@ export default function App() {
   </PaperScreen>;
 
   if (game.phase === "MATCHING") return <PaperScreen ambientSrc={featured.src}>
-    <AppHeader nickname={game.nickname}/>
+    <AppHeader nickname={game.nickname} growth={game.growth}/>
     <section data-testid="matching-screen" className="center-card fade-up">
       <div className="spinner-ring"/>
       <h1 className="display-title mt-8">상대를 찾고 있어요</h1>
@@ -216,7 +217,7 @@ export default function App() {
   const endReason = snapshot.endReason === "COMPLETED" ? "전체 문제 먼저 완료" : snapshot.endReason === "TIMEOUT" ? "제한시간 종료" : snapshot.endReason === "FORFEIT" ? (iWon ? "상대 기권" : "본인 기권") : snapshot.endReason === "MISTAKE_LIMIT" ? (iWon ? "상대 오답 3회" : "오답 3회") : "경기 종료";
 
   return <PaperScreen ambientSrc={puzzle?.originalSrc ?? featured.src}>
-    <AppHeader nickname={game.nickname} trailing={forfeitButton}/>
+    <AppHeader nickname={game.nickname} growth={game.growth} trailing={forfeitButton}/>
 
     {snapshot.state === "READY" && <section data-testid="ready-screen" className="center-card fade-up">
       <p className="eyebrow">상대를 찾았어요</p>
@@ -253,6 +254,7 @@ export default function App() {
         <p className="muted pt-2 text-[12px]">찾은 차이 {opponent?.totalFoundCount ?? 0} / {opponent?.totalDifferenceCount ?? snapshot.totalDifferenceCount} · 시간 보너스 {formatScore(opponent?.timeBonus)}점</p>
       </div>
       <p className="muted mt-5 text-[12px]">차이 1개당 10점, 모두 끝내면 남은 시간 1초당 0.5점을 더해요.</p>
+      <RewardPanel reward={game.matchRewards[game.match.matchId]} note={!iWon && snapshot.winnerId && snapshot.endReason === "FORFEIT" ? "기권한 경기는 보상이 없어요." : undefined}/>
       <button type="button" onClick={game.returnToLobby} className="btn-primary mt-7 w-full">로비로 돌아가기</button>
     </section>}
 

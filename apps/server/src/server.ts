@@ -6,8 +6,14 @@ import {
   GAME_CONFIG,
   GAME_DIFFICULTIES,
   GAME_MODES,
+  emptyGrowth,
+  grantMatchReward,
+  grantSoloReward,
+  growthView,
   type ClientToServerEvents,
   type MatchSettings,
+  type PlayerGrowth,
+  type PlayerGrowthPayload,
   type ServerToClientEvents,
 } from "@spot-battle/shared";
 import Fastify, { type FastifyInstance } from "fastify";
@@ -128,6 +134,9 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
   const guestSessionRetentionMs = options.guestSessionRetentionMs ?? 7 * 24 * 60 * 60 * 1_000;
   const guestSessionCleanupIntervalMs = options.guestSessionCleanupIntervalMs ?? 60 * 1_000;
   const sessions = new GuestSessionRegistry(guestSessionRetentionMs);
+  const growthByPlayer = new Map<string, PlayerGrowth>();
+  /** 레벨·코인이 있는 게스트는 오래 보존한다. */
+  const growthRetentionMs = 180 * 24 * 60 * 60 * 1_000;
   const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const finishedMatchCleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const persistedMatches = new Set<string>();
@@ -175,7 +184,38 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
   }
 
   function deleteGuest(session: GuestSession): void {
+    growthByPlayer.delete(session.playerId);
     trackGuestWrite(matchStore.deleteGuest(session.playerId));
+  }
+
+  function growthOf(playerId: string): PlayerGrowth {
+    return growthByPlayer.get(playerId) ?? emptyGrowth();
+  }
+
+  function storeGrowth(playerId: string, growth: PlayerGrowth): void {
+    growthByPlayer.set(playerId, growth);
+    trackGuestWrite(matchStore.saveGrowth(playerId, growth));
+  }
+
+  function growthPayload(playerId: string, extra: Omit<PlayerGrowthPayload, "progress"> = {}): PlayerGrowthPayload {
+    return { progress: growthView(growthOf(playerId)), ...extra };
+  }
+
+  function hasProtectedGrowth(playerId: string, now: number): boolean {
+    const session = sessions.getByPlayer(playerId);
+    return (growthByPlayer.get(playerId)?.totalXp ?? 0) > 0 && !!session && now - session.lastSeenAt < growthRetentionMs;
+  }
+
+  /** 종료된 경기의 보상을 한 번만 지급한다. 여러 종료 경로에서 불려도 안전하다. */
+  function rewardIfFinished(match: GameMatch): void {
+    if (match.currentState !== "FINISHED") return;
+    const snapshot = match.snapshot();
+    for (const player of snapshot.players) {
+      const granted = grantMatchReward(growthOf(player.playerId), match.matchId, snapshot, player.playerId);
+      if (!granted) continue;
+      storeGrowth(player.playerId, granted.progress);
+      io.to(player.playerId).emit("player:growth", growthPayload(player.playerId, { reward: granted.reward, matchId: match.matchId }));
+    }
   }
 
   function createSession(): GuestSession {
@@ -237,6 +277,7 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
   }
 
   async function persistIfFinished(match: GameMatch): Promise<boolean> {
+    rewardIfFinished(match);
     if (
       persistedMatches.has(match.matchId) ||
       (match.currentState !== "FINISHED" && match.currentState !== "CANCELLED")
@@ -352,6 +393,7 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
   try {
     const restoredGuests = await matchStore.loadGuests();
     for (const guest of restoredGuests) sessions.restore(guest);
+    for (const { playerId, growth } of await matchStore.loadGrowth()) growthByPlayer.set(playerId, growth);
 
     const restoredMatches = await matchStore.loadActiveMatches();
     for (const state of restoredMatches) {
@@ -409,6 +451,7 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
       guestToken: session.guestToken,
       playerId: session.playerId,
     });
+    socket.emit("player:growth", growthPayload(session.playerId));
     resumeMatch(socket, session);
 
     socket.on("queue:join", (payload) => {
@@ -605,6 +648,25 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
         }
       }
     });
+    socket.on("solo:complete", (payload) => {
+      try {
+        const input = requirePayload(payload);
+        if (typeof input.puzzleId !== "string" || typeof input.elapsedMs !== "number") {
+          throw new GameRuleError("INVALID_PAYLOAD", "솔로 기록 형식이 올바르지 않습니다.");
+        }
+        enforceCooldown("solo");
+        const before = growthOf(session.playerId);
+        const result = grantSoloReward(before, input.elapsedMs, Date.now());
+        if (result.progress !== before) storeGrowth(session.playerId, result.progress);
+        socket.emit("player:growth", growthPayload(session.playerId, {
+          ...(result.reward ? { reward: result.reward } : {}),
+          ...(result.limitReached ? { soloLimitReached: true } : {}),
+        }));
+      } catch (error) {
+        emitGameError(socket, error);
+      }
+    });
+
     socket.on("disconnect", () => {
       if (session.socketId !== socket.id) return;
       session.socketId = null;
@@ -635,7 +697,8 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
       (playerId) =>
         [...waitingPlayers.values()].some((player) => player.playerId === playerId) ||
         reconnectTimers.has(playerId) ||
-        registry.getCurrentForPlayer(playerId) !== null,
+        registry.getCurrentForPlayer(playerId) !== null ||
+        hasProtectedGrowth(playerId, Date.now()),
     );
     for (const session of expired) deleteGuest(session);
   }, guestSessionCleanupIntervalMs);

@@ -1,10 +1,11 @@
-import type { FoundMark, NormalizedPoint } from "@spot-battle/shared";
+import { PROGRESSION_RULES, type FoundMark, type GrowthView, type NormalizedPoint, type RewardSummary } from "@spot-battle/shared";
 import { useEffect, useMemo, useState } from "react";
 import {
   ImageBoard,
   type ImageSelectionContext,
 } from "../../game/components/ImageBoard";
 import { clampViewport, type ImageViewport } from "../../game/model/image-geometry";
+import { RewardPanel } from "../../gallery/components/Growth";
 import { AppHeader, BoardPair, PaperScreen, ProgressTrack, StageScreen, ZoomControls, type AppTab } from "../../gallery/components/Gallery";
 import {
   SOLO_DIFFERENCE_COUNT,
@@ -44,7 +45,13 @@ function saveRecords(records: SoloRecords) {
   }
 }
 
-export function SoloGame({ nickname, onTab }: { nickname: string; onTab: (tab: AppTab) => void }) {
+export function SoloGame({ nickname, growth, soloResult, onComplete, onTab }: {
+  nickname: string;
+  growth: GrowthView | null;
+  soloResult: { reward: RewardSummary | null; limitReached: boolean } | null;
+  onComplete: (puzzleId: SoloPuzzleId, elapsedMs: number) => void;
+  onTab: (tab: AppTab) => void;
+}) {
   const [phase, setPhase] = useState<SoloPhase>("SELECT");
   const [puzzleId, setPuzzleId] = useState<SoloPuzzleId>("observatory");
   const [records, setRecords] = useState<SoloRecords>(loadRecords);
@@ -128,6 +135,7 @@ export function SoloGame({ nickname, onTab }: { nickname: string; onTab: (tab: A
 
     const result = soloElapsedMs(startedAtMs, Date.now(), wrongAnswers);
     setFinishedMs(result);
+    onComplete(puzzleId, result);
     setNowMs(Date.now());
     setPhase("FINISHED");
     setRecords((current) => {
@@ -156,7 +164,7 @@ export function SoloGame({ nickname, onTab }: { nickname: string; onTab: (tab: A
   if (phase === "SELECT") {
     return <PaperScreen ambientSrc={puzzle.originalSrc}>
       <div className="has-tabbar">
-        <AppHeader nickname={nickname} tab="SOLO" onTab={onTab}/>
+        <AppHeader nickname={nickname} growth={growth} tab="SOLO" onTab={onTab}/>
         <section className="fade-up mt-7">
           <p className="eyebrow">혼자 하기</p>
           <h1 className="display-title mt-1">솔로 타임어택</h1>
@@ -190,13 +198,14 @@ export function SoloGame({ nickname, onTab }: { nickname: string; onTab: (tab: A
   if (phase === "FINISHED" && finishedMs !== null) {
     const isBest = best === finishedMs;
     return <PaperScreen ambientSrc={puzzle.originalSrc}>
-      <AppHeader nickname={nickname}/>
+      <AppHeader nickname={nickname} growth={growth}/>
       <section data-testid="solo-finished" className="center-card fade-up">
         <p className="eyebrow">{puzzle.label}</p>
         <h1 className="display-title mt-1">5개 모두 찾았어요!</h1>
         <p className="big-number mt-6" style={{ fontSize: "clamp(64px, 16vw, 104px)" }}>{formatSoloTime(finishedMs)}</p>
         <p className="muted mt-3 text-[14px]">오답 {wrongAnswers}회 · 페널티 {wrongAnswers * SOLO_WRONG_PENALTY_MS / 1_000}초 포함</p>
         <p className="mt-2 text-[14px] font-bold" style={{ color: isBest ? "var(--gold)" : undefined }}>{isBest ? "새 기록이에요 · " : ""}개인 최고기록 {formatSoloTime(best ?? finishedMs)}</p>
+        <RewardPanel reward={soloResult?.reward} note={soloResult?.limitReached ? `오늘 솔로 보상을 모두 받았어요 · 하루 ${PROGRESSION_RULES.soloDailyLimit}번` : undefined}/>
         <div className="mt-8 grid gap-2">
           <button type="button" onClick={() => void start()} className="btn-primary w-full">다시 도전</button>
           <div className="grid grid-cols-2 gap-2"><button type="button" onClick={returnToSelection} className="btn-secondary">다른 문제</button><button type="button" onClick={() => onTab("HOME")} className="btn-secondary">홈으로</button></div>

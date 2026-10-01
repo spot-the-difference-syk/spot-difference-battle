@@ -5,11 +5,13 @@ import type {
   GameErrorPayload,
   GamePuzzleId,
   GameSnapshot,
+  GrowthView,
   GuessResult,
   MatchSettings,
   MatchFoundPayload,
   NormalizedPoint,
   ReportReason,
+  RewardSummary,
   SessionReadyPayload,
 } from "@spot-battle/shared";
 import { useEffect, useRef, useState } from "react";
@@ -64,6 +66,10 @@ export function useGameClient() {
   const [error, setError] = useState<GameErrorPayload | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
   const [clockOffsetMs, setClockOffsetMs] = useState(0);
+  const [growth, setGrowth] = useState<GrowthView | null>(null);
+  const [matchRewards, setMatchRewards] = useState<Readonly<Record<string, RewardSummary>>>({});
+  const [soloResult, setSoloResult] = useState<{ reward: RewardSummary | null; limitReached: boolean } | null>(null);
+  const soloPendingRef = useRef(false);
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
   const dismissedRef = useRef(new Set<string>());
@@ -119,6 +125,16 @@ export function useGameClient() {
       setError(payload);
     });
     socket.on("game:report-result", ({ reportId: id }) => setReportId(id));
+    socket.on("player:growth", (payload) => {
+      setGrowth(payload.progress);
+      const { matchId, reward } = payload;
+      if (matchId && reward) setMatchRewards((current) => ({ ...current, [matchId]: reward }));
+      // A plain sync after reconnecting carries neither field, so it does not settle a pending solo result.
+      if (!matchId && soloPendingRef.current && (reward || payload.soloLimitReached)) {
+        soloPendingRef.current = false;
+        setSoloResult({ reward: reward ?? null, limitReached: Boolean(payload.soloLimitReached) });
+      }
+    });
     socket.on("queue:left", () => setPhase("LOBBY"));
     return () => { socket.disconnect(); socketRef.current = null; };
   }, []);
@@ -140,6 +156,17 @@ export function useGameClient() {
     error,
     reportId,
     clearError: () => setError(null),
+    /** 서버가 보낸 레벨·코인. 연결 전에는 null. */
+    growth,
+    /** 경기별로 받은 보상 */
+    matchRewards,
+    /** 마지막 솔로 완주 보상 결과 */
+    soloResult,
+    completeSolo: (puzzleId: string, elapsedMs: number) => {
+      soloPendingRef.current = true;
+      setSoloResult(null);
+      socketRef.current?.emit("solo:complete", { puzzleId, elapsedMs });
+    },
     saveNickname: (value: string) => {
       const normalized = value.trim().slice(0, 16);
       if (normalized.length < 2) {

@@ -19,6 +19,8 @@ test("a solo player can finish five hard differences and keep a personal record"
   await expect(page.getByText("최고 기록 없음")).toHaveCount(5);
   await page.getByTestId("solo-puzzle-start").click();
   await expect(page.getByTestId("solo-playing")).toBeVisible({ timeout: 6_000 });
+  // 3초보다 빠른 완주는 서버가 비정상 기록으로 보고 보상하지 않는다.
+  await page.waitForTimeout(3_100);
 
   for (const point of [
     { x: 0.31, y: 0.21 },
@@ -32,6 +34,7 @@ test("a solo player can finish five hard differences and keep a personal record"
 
   await expect(page.getByTestId("solo-finished")).toContainText("5개 모두 찾았어요!");
   await expect(page.getByTestId("solo-finished")).toContainText("개인 최고기록");
+  await expect(page.getByTestId("reward-panel")).toContainText("+30");
   await page.getByRole("button", { name: "다른 문제" }).click();
   await expect(page.getByText(/최고 \d+\.\d{2}초/)).toHaveCount(1);
   await page.getByRole("button", { name: "아침의 베이커리" }).click();

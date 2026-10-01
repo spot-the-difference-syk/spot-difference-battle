@@ -1,6 +1,8 @@
+import type { GrowthView } from "@spot-battle/shared";
 import { House, Minus, Plus, Timer } from "lucide-react";
 import type { ReactNode } from "react";
 import { clampViewport, type ImageViewport } from "../../game/model/image-geometry";
+import { CoinChip, ProfileBadge } from "./Growth";
 
 export type AppTab = "HOME" | "SOLO";
 
@@ -29,7 +31,7 @@ function Ambient({ src, tone }: { src: string; tone: "light" | "dark" }) {
   </div>;
 }
 
-export function AppHeader({ nickname, tab, onTab, trailing }: { nickname?: string; tab?: AppTab; onTab?: (tab: AppTab) => void; trailing?: ReactNode }) {
+export function AppHeader({ nickname, growth = null, tab, onTab, trailing }: { nickname?: string; growth?: GrowthView | null; tab?: AppTab; onTab?: (tab: AppTab) => void; trailing?: ReactNode }) {
   return <header className="app-header">
     <span className="brand">틀린그림 갤러리</span>
     {tab && onTab && <nav className="app-nav" aria-label="메뉴">
@@ -38,7 +40,8 @@ export function AppHeader({ nickname, tab, onTab, trailing }: { nickname?: strin
     </nav>}
     <div className="header-trailing">
       {trailing}
-      {nickname && <span className="profile"><span className="avatar" aria-hidden>{nickname.slice(0, 1)}</span><span className="profile-name">{nickname}</span></span>}
+      {nickname && growth && <CoinChip coins={growth.coins}/>}
+      {nickname && <ProfileBadge nickname={nickname} growth={growth}/>}
     </div>
   </header>;
 }
