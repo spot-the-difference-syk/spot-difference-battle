@@ -4,10 +4,19 @@ export const SOLO_DIFFERENCE_COUNT = 5;
 export const SOLO_WRONG_PENALTY_MS = 3_000;
 export const SOLO_TOUCH_TARGET_RADIUS_PX = 24;
 
+export type SoloRegion = NormalizedPoint & { radius: number };
+
 export interface SoloDifference {
   id: string;
   label: string;
-  region: NormalizedPoint & { radius: number };
+  /** Primary answer area. The found mark is drawn here. */
+  region: SoloRegion;
+  /** Additional hit areas for large or multi-part changes (e.g. both clock hands, a whole object). */
+  extraRegions?: readonly SoloRegion[];
+}
+
+export function soloRegions(difference: SoloDifference): readonly SoloRegion[] {
+  return difference.extraRegions ? [difference.region, ...difference.extraRegions] : [difference.region];
 }
 
 export function findSoloDifference(
@@ -16,18 +25,20 @@ export function findSoloDifference(
   point: NormalizedPoint,
   minimumHitRadius = 0,
 ): SoloDifference | null {
-  return differences
-    .filter((difference) => !foundIds.has(difference.id))
-    .map((difference) => {
-      const deltaX = point.x - difference.region.x;
-      const deltaY = point.y - difference.region.y;
-      return { difference, distanceSquared: (deltaX * deltaX) + (deltaY * deltaY) };
-    })
-    .filter(({ difference, distanceSquared }) => {
-      const hitRadius = Math.max(difference.region.radius, minimumHitRadius);
-      return distanceSquared <= hitRadius ** 2;
-    })
-    .sort((left, right) => left.distanceSquared - right.distanceSquared)[0]?.difference ?? null;
+  let best: { difference: SoloDifference; distanceSquared: number } | null = null;
+  for (const difference of differences) {
+    if (foundIds.has(difference.id)) continue;
+    for (const region of soloRegions(difference)) {
+      const deltaX = point.x - region.x;
+      const deltaY = point.y - region.y;
+      const distanceSquared = (deltaX * deltaX) + (deltaY * deltaY);
+      const hitRadius = Math.max(region.radius, minimumHitRadius);
+      if (distanceSquared <= hitRadius ** 2 && (!best || distanceSquared < best.distanceSquared)) {
+        best = { difference, distanceSquared };
+      }
+    }
+  }
+  return best?.difference ?? null;
 }
 
 export function minimumSoloHitRadius(pointerType: string, boardSizePx: number): number {
