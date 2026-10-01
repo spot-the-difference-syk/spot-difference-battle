@@ -50,6 +50,15 @@ WebSocket Origin은 같은 웹 사이트와 다음 AIT 주소만 허용한다. �
 4. DB 퍼즐을 사용할 때만 `PUZZLE_CATALOG_SOURCE="database"`로 변경한다. Hyperdrive와 `PUZZLE_ASSET_BASE_URL`(R2 배포 Worker 주소) 없이는 이 모드로 시작할 수 없다. 처음 읽기에 실패하면 코드 카탈로그로 자동 전환하지 않는다. 그 뒤 새로 읽기에 실패하면 마지막 정상 목록을 유지한다.
 5. 재배포 후 `/health`의 `database`가 `true`인지 확인한다. 기본 DO 모드에서는 `null`이다.
 
+### 성장 기록(레벨·코인) 백업
+
+Hyperdrive가 연결돼 있으면 Worker가 레벨·코인·꾸미기·수집 기록을 Supabase `player_growth`에 백업한다. 별도 설정값은 없고, 아래 마이그레이션만 적용돼 있으면 된다.
+
+- `20261001000100_player_growth.sql`, `20261002000100_player_growth_worker_backup.sql`
+- 적용 전 배포해도 게임은 정상 동작한다. 백업만 실패해 로그에 `database.growth_save_failed`가 1분 간격으로 남고, 기록은 DO에 보관된 채 적용 후 자동으로 올라간다.
+- 확인: `SELECT count(*), max(updated_at) FROM player_growth;`
+- 운영 서버는 Cloudflare Worker이고, `apps/server`(Node)는 로컬 개발·자동 테스트 전용이다.
+
 DB 카탈로그는 Durable Object가 5분마다 다시 읽고, 웹은 `GET /catalog`(Worker가 먼저 처리, 60초 캐시)로 활성 목록과 R2 이미지 주소를 받는다. 새 그림은 `pnpm puzzle publish … --upload --activate`로 R2와 DB에 올리면 재배포 없이 나타난다(`docs/GAME_ASSETS.md` 7절). 대결 정답은 `/catalog`에 포함되지 않는다.
 
 종료 경기는 먼저 Durable Object에 저장한다. Supabase 저장이 실패하면 기록을 유지하고 alarm에서 재시도한다. Supabase 저장이 끝나야 활성 기록을 정리한다. 신고는 종료 경기의 저장을 먼저 완료한 뒤 DB에 등록한다. DB 장애 시 신고 오류를 표시해 사용자가 재시도할 수 있다.
