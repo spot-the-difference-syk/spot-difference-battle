@@ -1,7 +1,7 @@
 # 테스트 구조와 배치 결정
 
 > 문서 상태: CURRENT
-> 기준일: 2026-09-04
+> 기준일: 2026-10-01
 
 이 문서는 테스트의 **검증 범위**, **실행 주체**, **소유 패키지**를 기준으로 저장 위치를 정한다. 결론은 모든 테스트를 루트에 집중하지 않고, 패키지 테스트는 해당 패키지에 두며 여러 앱을 함께 검증하는 E2E만 루트 `tests/e2e/`에 두는 혼합 구조다.
 
@@ -9,28 +9,28 @@
 
 ```text
 apps/
-├─ web/
-│  └─ src/
-│     ├─ config/*.test.ts
-│     └─ features/game/**/*.test.ts
-└─ server/
-   └─ test/
-      ├─ unit/*.test.ts
-      └─ integration/*.integration.test.ts
-packages/
-└─ game-core/
-   └─ test/*.test.ts
-tests/
-└─ e2e/*.spec.ts
+├─ web/src/**/*.test.ts
+└─ server/test/
+   ├─ unit/*.test.ts
+   └─ integration/*.integration.test.ts
+packages/game-core/test/*.test.ts
+workers/
+├─ realtime/test/*.test.ts
+└─ r2-delivery/test/*.test.mjs
+scripts/*.test.mjs
+tests/e2e/*.spec.ts
 ```
 
 | 계층 | 위치 | 실행기 | 검증 범위 |
 |---|---|---|---|
-| 웹 단위 테스트 | `apps/web/src/**/*.test.ts` | Vitest | 설정, 화면 모델, 좌표 변환, 경쟁전·솔로 퍼즐 카탈로그와 타임어택 엔진 |
-| 서버 단위 테스트 | `apps/server/test/unit/` | Vitest | 세션, 경기 레지스트리, 저장소, 로그, Origin 처리 |
-| 서버 통합 테스트 | `apps/server/test/integration/` | Vitest | Fastify·Socket.IO·PostgreSQL·정적 웹 연동 |
-| 게임 코어 단위 테스트 | `packages/game-core/test/` | Vitest | 좌표 판정, 점수, 경기 상태 머신 |
-| 시스템 E2E | `tests/e2e/` | Playwright | 실제 웹과 서버를 함께 띄운 사용자 흐름·접근성 및 클라이언트 솔로 모드 |
+| 웹 단위 테스트 | `apps/web/src/**/*.test.ts` | Vitest | 설정, 화면 모델, 좌표 변환, 그림 카탈로그·사전 로드, 솔로 엔진 |
+| 서버 단위 테스트 | `apps/server/test/unit/` | Vitest | 세션, 경기 레지스트리, 카탈로그 검증·갱신, 저장소, 로그, Origin 처리 |
+| 서버 통합 테스트 | `apps/server/test/integration/` | Vitest | Fastify·Socket.IO·PostgreSQL 연동(PostgreSQL 테스트는 `SUPABASE_DB_URL`이 있을 때만) |
+| 게임 코어 단위 테스트 | `packages/game-core/test/` | Vitest | 좌표 판정, 점수, 경기 상태 머신, 성장·꾸미기 규칙 |
+| 운영 Worker 테스트 | `workers/realtime/test/` | Vitest | Durable Object 게임 흐름, 카탈로그, 성장 기록 백업·복원 |
+| R2 전달 Worker 테스트 | `workers/r2-delivery/test/` | node:test | 경로 검증, 캐시, 상태 코드, 로그 |
+| 스크립트 테스트 | `scripts/*.test.mjs` | node:test | 그림 등록 도구 |
+| 시스템 E2E | `tests/e2e/` | Playwright | 실제 웹과 개발 서버(또는 로컬 Worker)를 함께 띄운 사용자 흐름·접근성·솔로 |
 
 ## 서버 테스트를 `src` 밖에 둔 이유
 
@@ -90,6 +90,7 @@ pnpm test
 
 # 웹과 서버를 띄우는 Playwright E2E
 pnpm e2e
+pnpm e2e:cloudflare   # 로컬 Worker로 실행
 
 # 특정 패키지만 검사
 pnpm --filter @spot-battle/server test

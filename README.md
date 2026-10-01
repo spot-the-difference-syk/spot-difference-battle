@@ -1,71 +1,54 @@
-# Spot Difference Battle
+# Spot Difference Battle — 틀린그림 갤러리
 
 > 문서 상태: CURRENT
-> 현재 게임 규칙의 유일한 Markdown 정본은 [`docs/GAME_RULES.md`](docs/GAME_RULES.md)다.
+> 기준일: 2026-10-01
+> 게임 규칙의 유일한 Markdown 정본은 [`docs/GAME_RULES.md`](docs/GAME_RULES.md)다.
 
-두 플레이어가 제한시간 동안 겨루는 실시간 1대1 경쟁전과, 혼자 어려운 차이점 5개를 찾아 개인 최고기록을 줄이는 솔로 타임어택을 제공합니다.
+같은 그림 두 장에서 다른 곳을 찾는 게임이다. 웹·앱인토스·Android(WebView)로 제공한다.
 
-## 다음 게임 방식
+- **1대1 대결**: 두 사람이 같은 순서의 그림 10점을 동시에 푼다. 그림마다 차이 3개를 찾으면 각자 다음 그림으로 넘어가고, 전체를 먼저 끝낸 사람이 즉시 이긴다. 시간이 끝나면 점수·오답 순으로 판정한다.
+- **혼자하기(솔로 타임어택)**: 어려운 차이 5개를 찾는 시간을 줄인다. 퍼즐별 최고 기록은 기기에 저장한다.
+- **성장**: 대결·솔로 보상으로 레벨·코인을 얻고, 코인으로 꾸미기 아이템을 산다. 끝까지 푼 그림은 "내 갤러리"에 수집되고 오늘의 목표가 있다. 보상은 항상 서버가 계산한다.
 
-1. 두 플레이어가 매칭·준비한다.
-2. 서버가 양쪽에 동일한 문제 순서를 배정한다.
-3. 이미지 로드 후 3초 카운트다운으로 동시에 시작한다.
-4. 변경본에서 차이 3개를 찾는다.
-5. 모두 찾은 플레이어는 상대를 기다리지 않고 다음 이미지로 이동한다.
-6. 전체 문제를 먼저 완료한 플레이어가 즉시 승리한다.
-7. 제한시간이 끝나면 총점(찾은 차이 1개당 10점), 오답이 적은 순서로 판정하고 모두 같으면 무승부다. 생존전은 오답 3회에 즉시 패배한다.
-8. 경쟁전 힌트와 문제별 선착 보너스는 없다.
-9. 오답 입력 잠금은 난이도에 따라 0.5~2초이며 재접속 유예는 10초다.
+## 운영 구조
 
-현재 웹·서버는 이 규칙의 동시 대전 흐름을 구현한다.
+| 구성 | 역할 |
+|---|---|
+| Cloudflare Worker + Durable Object (`workers/realtime`) | **운영 서버.** 웹 정적 파일, 실시간 대결(`/ws`), 그림 목록(`/catalog`), 성장 기록 |
+| R2 + 전달 Worker (`workers/r2-delivery`) | 그림 이미지 저장·제공 |
+| Supabase (Hyperdrive로 연결) | 그림 목록·정답(`puzzle_catalog`), 경기 기록, 신고, 성장 기록 백업 |
+| Node 서버 (`apps/server`) | **로컬 개발·자동 테스트 전용.** 운영에 배포하지 않는다 |
 
-솔로 타임어택은 신규 전용 퍼즐 5세트를 사용한다. 이미지 로드 후 3초 카운트다운하며, 오답마다 기록에 3초가 추가되고 퍼즐별 최고기록은 현재 기기에 저장된다.
+main에 머지하면 Cloudflare가 자동으로 다시 배포한다. 자세한 내용은 [Cloudflare 배포](docs/CLOUDFLARE_DEPLOYMENT.md)를 본다.
 
-## 에셋 상태
+## 저장소 구성
 
-- 카페·숲·바다·도시·겨울: 원본·변경본과 수동 정답 3곳 등록 완료, 플레이 난이도 검수 필요
-- 연구실: 유효한 변경본 필요
-- 거실: 라이선스 미확인으로 출시 제외
+- `apps/web/`: React·Vite 웹 앱(앱인토스·Android 공용), 앱에 들어 있는 기본 그림
+- `apps/server/`: 로컬 개발용 Fastify·Socket.IO 서버, Worker와 공유하는 카탈로그·저장소 코드
+- `apps/android/`: Android WebView 래퍼
+- `workers/realtime/`: 운영 게임 Worker
+- `workers/r2-delivery/`: R2 이미지 전달 Worker
+- `packages/shared/`: 공유 규칙·타입·통신 계약·성장/꾸미기 규칙
+- `packages/game-core/`: 프레임워크와 분리된 대결 판정
+- `supabase/migrations/`: DB 스키마
+- `scripts/`: 빌드·그림 등록(`pnpm puzzle`)·구조 검사
+- `tests/e2e/`: Playwright 브라우저 테스트
+- `docs/`: 명세·설계·운영 문서, `docs/history/`는 과거 기록
 
-내부 기능 검증에는 5세트 이상, 3분 경기에는 반복되지 않는 10세트 이상, 초기 반복 서비스에는 20~30세트를 목표로 한다.
-
-## 프로젝트 구성
-
-- `apps/web/`: React 웹 앱과 배포용 퍼즐 이미지
-- `apps/server/`: Fastify·Socket.IO 서버와 PostgreSQL 저장소
-- `packages/shared/`: 웹·서버 공유 규칙, 타입, Socket.IO 계약
-- `packages/game-core/`: 프레임워크와 분리된 서버 권한 판정
-- `tests/e2e/`: 웹·서버 전체를 검증하는 Playwright 브라우저 E2E 테스트
-- `docs/`: 현재 명세, 설계 자료, 과거 변경 기록
-
-활성 웹 진입점은 `apps/web/src/main.tsx`이며 `App`을 렌더한다. 전체 디렉터리 책임과 의존 방향은 [저장소 구조](docs/REPOSITORY_STRUCTURE.md)를 따른다.
+디렉터리 책임과 의존 방향은 [저장소 구조](docs/REPOSITORY_STRUCTURE.md)를 따른다.
 
 ## 주요 문서
 
-- [문서 운영 기준](docs/DOCUMENTATION.md)
-- [게임 규칙](docs/GAME_RULES.md)
-- [게임 모드와 난이도](docs/GAME_MODES.md)
-- [MVP 결정 기록](docs/MVP_DECISIONS.md)
-- [게임 상태](docs/GAME_STATE.md)
-- [게임 기획](docs/GAME_DESIGN.md)
-- [사용자 흐름](docs/USER_FLOW.md)
-- [화면 명세](docs/SCREEN_SPEC.md)
-- [기술 설계](docs/TECH_SPEC.md)
-- [테스트 계획](docs/TEST_PLAN.md)
-- [테스트 구조](docs/TEST_STRUCTURE.md)
-- [구현 백로그](docs/IMPLEMENTATION_BACKLOG.md)
-- [UI 현황 점검](docs/UI_AUDIT.md)
-- [문제 에셋 가이드](docs/GAME_ASSETS.md)
-- [컨테이너 배포 가이드](docs/DEPLOYMENT.md)
-- [Cloudflare 웹·실시간 대전 배포](docs/CLOUDFLARE_DEPLOYMENT.md)
-- [저장소 구조](docs/REPOSITORY_STRUCTURE.md)
-- [솔로 퍼즐 생성 기록](docs/design/SOLO_ASSET_PROVENANCE.md)
-
-`docs/history/`의 날짜별 변경 문서와 과거 릴리스는 당시 구현의 역사 기록이다.
+- 규칙·기획: [게임 규칙](docs/GAME_RULES.md) · [게임 모드](docs/GAME_MODES.md) · [게임 기획](docs/GAME_DESIGN.md) · [결정 기록](docs/MVP_DECISIONS.md)
+- 화면·흐름: [사용자 흐름](docs/USER_FLOW.md) · [화면 명세](docs/SCREEN_SPEC.md) · [UI 구현 기준](docs/design/UI_GUIDELINES.md)
+- 기술: [기술 설계](docs/TECH_SPEC.md) · [게임 상태](docs/GAME_STATE.md) · [DB 설계](docs/DATABASE_DESIGN.md)
+- 운영: [Cloudflare 배포](docs/CLOUDFLARE_DEPLOYMENT.md) · [그림 에셋·등록](docs/GAME_ASSETS.md) · [Android 빌드 환경](docs/android-build-environment.md)
+- 품질: [테스트 계획](docs/TEST_PLAN.md) · [테스트 구조](docs/TEST_STRUCTURE.md) · [구현 백로그](docs/IMPLEMENTATION_BACKLOG.md)
+- 문서 운영: [문서 운영 기준](docs/DOCUMENTATION.md)
 
 ## 로컬 실행
 
-필요 항목은 Apps in Toss SDK 3.1.1과 AIT Devtools 3.1.1이 요구하는 Node.js 24 이상 및 pnpm 11.9.0이며, PostgreSQL을 쓸 때만 Docker Desktop이 필요하다.
+Node.js 24 이상과 pnpm 11.9.0이 필요하다. PostgreSQL은 DB 테스트를 돌릴 때만 필요하다(`docker compose up postgres`).
 
 ```powershell
 pnpm setup
@@ -73,29 +56,34 @@ pnpm dev
 ```
 
 - 웹: `http://localhost:5173`
-- 서버 상태: `http://localhost:3001/health`
+- 개발 서버 상태: `http://localhost:3001/health`
+
+PostgreSQL 없이 실행하면 메모리 저장소를 쓴다. 개발 서버 환경변수는 `.env.example`을 본다.
 
 ### 같은 Wi-Fi 휴대폰 테스트
 
 1. PC와 휴대폰을 같은 Wi-Fi에 연결한다.
-2. PC PowerShell에서 `ipconfig`로 Wi-Fi 어댑터의 IPv4 주소를 확인한다.
-3. 저장소 루트에서 `pnpm dev`를 실행한다.
-4. 휴대폰에서 `http://<PC의 IPv4 주소>:5173`으로 접속한다.
+2. PC에서 `ipconfig`로 Wi-Fi IPv4 주소를 확인한다.
+3. `pnpm dev`를 실행하고 휴대폰에서 `http://<PC IPv4>:5173`으로 접속한다.
 
-개발 웹은 접속한 PC 호스트의 `3001` 포트로 API를 자동 연결한다. Windows 방화벽 알림이 나오면 개인 네트워크만 허용한다. 이 기능은 같은 사설망의 개발 테스트용이며 인터넷에 직접 공개하는 용도가 아니다.
+개발 웹은 접속한 PC의 `3001` 포트 서버에 자동 연결한다. 같은 사설망 테스트용이며 인터넷에 공개하지 않는다.
 
-### Apps in Toss SDK 3.1.1 테스트
+### 앱인토스 테스트
 
-SDK 3.x의 로컬 기능 검증은 샌드박스 앱이나 Metro가 아니라 `pnpm dev`로 실행한 브라우저의 AIT Devtools를 사용한다. 실제 토스 환경은 `pnpm build:ait`로 `.ait` 번들을 만든 뒤 앱인토스 콘솔에 업로드하고 QR 코드로 테스트한다.
-
-서버의 프로덕션 CORS는 SDK 3.x의 실서비스 및 QR 테스트 Origin인 `https://spot-difference-syk.web.tossmini.com`과 `https://spot-difference-syk.private-web.tossmini.com`을 허용한다.
-
-검사:
+SDK 3.x 기능은 `pnpm dev`로 띄운 브라우저의 AIT Devtools로 확인한다. 실제 토스 환경용 번들은 운영 Worker 주소를 넣어 만든다.
 
 ```powershell
-pnpm check
-pnpm test
-pnpm build
+$env:VITE_SERVER_URL="https://<운영 game Worker 주소>"
+pnpm build:ait:cloudflare
 ```
 
-자동 테스트는 동시 사전 로드·카운트다운·독립 정답 판정·제한시간 승패 우선순위를 검증한다. PostgreSQL 없이 실행하면 메모리 저장소를 사용한다. PostgreSQL·환경변수·컨테이너 실행은 `.env.example`과 `docs/DEPLOYMENT.md`를 참고한다.
+> `pnpm build:ait`(Cloudflare 없이)는 로컬 Node 서버(Socket.IO)에 연결하는 번들을 만든다. 토스에 올리는 번들은 `build:ait:cloudflare`를 쓴다.
+
+## 검사
+
+```powershell
+pnpm check   # 구조·타입 검사
+pnpm test    # 단위·통합 테스트(그림 등록 도구 포함)
+pnpm e2e     # 브라우저 테스트(Node 개발 서버)
+pnpm e2e:cloudflare   # 브라우저 테스트(로컬 Worker)
+```
