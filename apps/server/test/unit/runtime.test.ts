@@ -44,17 +44,17 @@ it("never falls back to code catalog when database startup fails", () => {
   expect(result.status).not.toBe(0);
   expect(result.stderr).toMatch(/ECONNREFUSED|connect/);
 }, 10_000);
-it("rejects an unsupported code-mode GAME_SCENE_ID at startup", () => {
+it("rejects a GAME_SCENE_ID that is not in the active catalog at startup", () => {
   const result = spawnSync(process.execPath, ["--import", "tsx", "src/index.ts"], {
     cwd: process.cwd(),
     env: {
       ...process.env, NODE_ENV: "test", STORAGE_DRIVER: "memory", SUPABASE_DB_URL: "",
-      PUZZLE_CATALOG_SOURCE: "code", GAME_SCENE_ID: "home-office", HOST: "127.0.0.1", PORT: "0",
+      PUZZLE_CATALOG_SOURCE: "code", GAME_SCENE_ID: "no-such-picture", HOST: "127.0.0.1", PORT: "0",
     },
     timeout: 8_000,
     encoding: "utf8",
   });
   expect(result.error).toBeUndefined();
   expect(result.status).not.toBe(0);
-  expect(result.stderr).toMatch(/GAME_SCENE_ID must be one of/);
+  expect(result.stderr).toMatch(/GAME_SCENE_ID "no-such-picture" is absent from the active catalog/);
 });

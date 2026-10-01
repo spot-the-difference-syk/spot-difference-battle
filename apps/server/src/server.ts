@@ -109,7 +109,7 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
   const catalog = catalogService.catalog.battle;
   if (!catalog.length) throw new Error("Puzzle catalog is empty.");
   const requestedPuzzle = options.sceneId ? catalog.find((puzzle) => puzzle.id === options.sceneId) : undefined;
-  if (options.puzzles && options.sceneId && !requestedPuzzle) throw new Error("Requested scene is absent from the active catalog.");
+  if (options.sceneId && !requestedPuzzle) throw new Error(`GAME_SCENE_ID "${options.sceneId}" is absent from the active catalog.`);
   const app = Fastify({ logger: options.logger ?? false });
   if (options.webOrigin) {
     await app.register(cors, { origin: options.webOrigin });

@@ -1,15 +1,12 @@
 export {
-  DEFAULT_GAME_SCENE_ID,
   DEFAULT_MATCH_SETTINGS,
   GAME_CONFIG,
   GAME_DIFFICULTIES,
   GAME_DIFFICULTY_RULES,
   GAME_MODES,
   GAME_MODE_RULES,
-  GAME_SCENE_IDS,
   type GameDifficulty,
   type GameMode,
-  type GameSceneId,
   type MatchSettings,
 } from "./game/config.js";
 

@@ -36,16 +36,3 @@ export const GAME_DIFFICULTY_RULES = {
   NORMAL: { hitRadiusMultiplier: 1, wrongAnswerLockSeconds: 1 },
   HARD: { hitRadiusMultiplier: 0.8, wrongAnswerLockSeconds: 2 },
 } as const;
-
-/** 서버와 웹이 공통으로 사용하는 장면 식별자다. */
-export const GAME_SCENE_IDS = [
-  "prototype-room",
-  "cartoon-laboratory",
-  "cozy-cafe",
-  "enchanted-forest",
-  "cyber-city",
-  "underwater-treasure",
-] as const;
-
-export type GameSceneId = (typeof GAME_SCENE_IDS)[number];
-export const DEFAULT_GAME_SCENE_ID: GameSceneId = GAME_SCENE_IDS[0];

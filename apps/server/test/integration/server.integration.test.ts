@@ -455,6 +455,6 @@ describe("simultaneous game server", () => {
   it("rejects a scene absent from the injected active catalog", async () => {
     const homeOffice = GAME_PUZZLES.find((item) => item.id === "home-office")!;
     await expect(createGameServer({ puzzles: [homeOffice], sceneId: "not-active" }))
-      .rejects.toThrow("Requested scene is absent from the active catalog.");
+      .rejects.toThrow("is absent from the active catalog.");
   });
 });
