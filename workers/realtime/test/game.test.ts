@@ -15,11 +15,11 @@ class MemoryStorage implements Storage {
   async deleteAlarm() { this.alarm = null; }
 }
 interface TestPeer extends Peer { frames: Array<{ event: string; payload: unknown }> }
-async function harness(archive?: Archive) {
+async function harness(archive?: Archive, catalog = [GAME_PUZZLES[0]!]) {
   const storage = new MemoryStorage();
   let now = 1_000_000;
   const peers: TestPeer[] = [];
-  let game = new RealtimeGame(storage, () => peers, [GAME_PUZZLES[0]!], archive, () => now);
+  let game = new RealtimeGame(storage, () => peers, catalog, archive, () => now);
   await game.restore();
   const add = async (token?: string) => {
     const peer: TestPeer = { id: crypto.randomUUID(), frames: [], send(event, payload) { this.frames.push({ event, payload }); }, close() { const i = peers.indexOf(this); if (i >= 0) peers.splice(i, 1); } };
@@ -35,14 +35,36 @@ async function harness(archive?: Archive) {
     const first = await add(); const second = await add();
     await join(first); await join(second);
     await action(first, "game:ready"); await action(second, "game:ready");
-    for (const p of [first, second]) await action(p, "game:loaded", { puzzleId: GAME_PUZZLES[0]!.id, puzzleVersion: GAME_PUZZLES[0]!.assetVersion });
+    const firstPuzzle = catalog.find((puzzle) => puzzle.id === snapshot(first).currentPuzzleId)!;
+    for (const p of [first, second]) await action(p, "game:loaded", { puzzleId: firstPuzzle.id, puzzleVersion: firstPuzzle.assetVersion });
     now += 3000; await game.alarm();
     return { first, second };
   };
-  return { storage, peers, add, snapshot, token, action, join, start, get game() { return game; }, advance(ms: number) { now += ms; }, async restore() { game = new RealtimeGame(storage, () => peers, [GAME_PUZZLES[0]!], archive, () => now); await game.restore(); }, async disconnect(p: TestPeer) { p.close(); await game.disconnect(p); } };
+  return { storage, peers, add, snapshot, token, action, join, start, get game() { return game; }, advance(ms: number) { now += ms; }, async restore() { game = new RealtimeGame(storage, () => peers, catalog, archive, () => now); await game.restore(); }, async disconnect(p: TestPeer) { p.close(); await game.disconnect(p); } };
 }
 
 describe("Cloudflare authoritative game", () => {
+  it("broadcasts and archives the first ten-puzzle finisher immediately", async () => {
+    const saved: unknown[] = [];
+    const h = await harness({ async save(state) { saved.push(state); }, async report() { return "report"; } }, [...GAME_PUZZLES]);
+    const { first, second } = await h.start();
+    expect(h.snapshot(first).totalPuzzleCount).toBe(10);
+    for (let index = 0; index < 10; index += 1) {
+      const id = h.snapshot(first).currentPuzzleId;
+      const puzzle = GAME_PUZZLES.find((candidate) => candidate.id === id)!;
+      for (const difference of puzzle.differences) {
+        h.advance(150);
+        await h.action(first, "game:guess", { puzzleId: id, point: difference.regions[0] });
+      }
+    }
+    for (const peer of [first, second]) {
+      expect(h.snapshot(peer)).toMatchObject({ state: "FINISHED", endReason: "COMPLETED", winnerId: first.playerId });
+    }
+    expect(h.snapshot(second).players.find((player) => player.playerId === second.playerId)).toMatchObject({ totalFoundCount: 0, completedAllPuzzles: false });
+    await h.game.flushArchive();
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toMatchObject({ state: "FINISHED", winnerId: first.playerId, endReason: "COMPLETED" });
+  });
   it("matches only identical settings and can leave a queue", async () => {
     const h = await harness(); const a = await h.add(); const b = await h.add();
     await h.join(a); await h.join(b, { mode: "SPRINT", difficulty: "NORMAL" });

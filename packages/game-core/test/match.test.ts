@@ -83,30 +83,28 @@ describe("GameMatch simultaneous race", () => {
     expect(match.snapshot("p2")).toMatchObject({ currentPuzzleVersion: "forest-v1", nextPuzzleVersion: "underwater-v1" });
   });
 
-  it("waits only while one player has cleared every prepared puzzle", () => {
+  it.each(["p1", "p2"])("finishes as soon as %s clears the deck and rejects later guesses", (winnerId) => {
     const match = createMatch();
     let now = startPlaying(match);
-    for (const point of [{ x: 0.2, y: 0.2 }, { x: 0.5, y: 0.5 }, { x: 0.8, y: 0.8 }]) match.guess("p1", "enchanted-forest", point, ++now);
-    for (const point of [{ x: 0.2, y: 0.8 }, { x: 0.5, y: 0.2 }, { x: 0.8, y: 0.5 }]) match.guess("p1", "underwater-treasure", point, ++now);
-    expect(match.snapshot("p1")).toMatchObject({ state: "PLAYING", currentPuzzleId: null });
-  });
-
-  it("finishes immediately when both players clear every puzzle and awards remaining-time score", () => {
-    const match = createMatch();
-    let now = startPlaying(match);
-    const firstPoints = [
-      ["enchanted-forest", { x: 0.2, y: 0.2 }], ["enchanted-forest", { x: 0.5, y: 0.5 }], ["enchanted-forest", { x: 0.8, y: 0.8 }],
-      ["underwater-treasure", { x: 0.2, y: 0.8 }], ["underwater-treasure", { x: 0.5, y: 0.2 }], ["underwater-treasure", { x: 0.8, y: 0.5 }],
-    ] as const;
-    for (const [puzzleId, point] of firstPoints) match.guess("p1", puzzleId, point, ++now);
-    for (const [puzzleId, point] of firstPoints) match.guess("p2", puzzleId, point, now += 1_000);
-    const snapshot = match.snapshot("p1");
-    expect(snapshot).toMatchObject({ state: "FINISHED", endReason: "COMPLETED", winnerId: "p1", totalDifferenceCount: 6 });
-    const [first, second] = snapshot.players;
-    expect(first).toMatchObject({ completedAllPuzzles: true, totalFoundCount: 6, totalDifferenceCount: 6 });
-    expect(second).toMatchObject({ completedAllPuzzles: true, totalFoundCount: 6, totalDifferenceCount: 6 });
-    expect(first!.score).toBeGreaterThan(second!.score);
-    expect(first!.score).toBe(60 + first!.timeBonus);
+    const loserId = winnerId === "p1" ? "p2" : "p1";
+    match.guess(loserId, "enchanted-forest", { x: 0.2, y: 0.2 }, ++now);
+    for (const puzzle of puzzles) {
+      for (const difference of puzzle.differences) {
+        match.guess(winnerId, puzzle.id, difference.regions[0]!, ++now);
+      }
+    }
+    for (const viewer of [winnerId, loserId]) {
+      expect(match.snapshot(viewer)).toMatchObject({ state: "FINISHED", endReason: "COMPLETED", winnerId });
+    }
+    const snapshot = match.snapshot(winnerId);
+    const winner = snapshot.players.find((player) => player.playerId === winnerId)!;
+    const loser = snapshot.players.find((player) => player.playerId === loserId)!;
+    expect(winner).toMatchObject({ completedAllPuzzles: true, totalFoundCount: 6 });
+    expect(winner.timeBonus).toBeGreaterThan(0);
+    expect(winner.score).toBe(60 + winner.timeBonus);
+    expect(loser).toMatchObject({ completedAllPuzzles: false, totalFoundCount: 1, timeBonus: 0 });
+    expect(() => match.guess(loserId, "enchanted-forest", { x: 0.5, y: 0.5 }, ++now)).toThrowError(GameRuleError);
+    expect(GameMatch.restore(match.serialize()).snapshot(loserId)).toMatchObject({ state: "FINISHED", winnerId });
   });
 
   it("supports a different number of differences in each puzzle", () => {
