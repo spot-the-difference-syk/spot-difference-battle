@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AppHeader, BoardPair, PaperScreen, ProgressTrack, RESET_VIEWPORT, Segmented, StageScreen, ZoomControls, type AppTab } from "../features/gallery/components/Gallery";
 import { ArtworkShelf, FeaturedArtwork, featuredArtwork } from "../features/gallery/components/Exhibition";
 import { LevelAvatar, RewardPanel, titleName } from "../features/gallery/components/Growth";
+import { DailyGoal, MyGallery } from "../features/gallery/components/MyGallery";
 import { Wardrobe } from "../features/gallery/components/Wardrobe";
 import { ImageBoard } from "../features/game/components/ImageBoard";
 import { useGameClient } from "../features/game/hooks/use-game-client";
@@ -124,6 +125,8 @@ export default function App() {
 
   if (tab === "STYLE" && game.phase === "LOBBY") return <Wardrobe nickname={game.nickname} growth={game.growth} error={game.error} onTab={switchTab} onBuy={game.buyItem} onEquip={game.equipItem}/>;
 
+  if (tab === "ME" && game.phase === "LOBBY") return <MyGallery nickname={game.nickname} growth={game.growth} onTab={switchTab}/>;
+
   if (tab === "SOLO") return <SoloGame nickname={game.nickname} growth={game.growth} soloResult={game.soloResult} onComplete={game.completeSolo} onTab={switchTab}/>;
 
   if (game.phase === "LOBBY") return <PaperScreen ambientSrc={featured.src}>
@@ -136,6 +139,7 @@ export default function App() {
           <FeaturedArtwork artwork={featured}/>
         </div>
         <div className="lobby-side">
+          {game.growth && <DailyGoal goal={game.growth.daily}/>}
           <section className="panel grid gap-3">
             <h2 className="section-title">대결하기</h2>
             <Segmented label="게임 모드" value={mode} options={MODE_OPTIONS} onChange={setMode}/>

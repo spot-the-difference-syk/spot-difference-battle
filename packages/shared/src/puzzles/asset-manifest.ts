@@ -12,6 +12,17 @@ export const GAME_PUZZLE_IDS = [
 ] as const;
 
 export type GamePuzzleId = (typeof GAME_PUZZLE_IDS)[number];
+
+/** 솔로 타임어택 전용 그림. 이미지·정답은 웹 번들에 있고 서버는 수집 기록 검증에만 쓴다. */
+export const SOLO_PUZZLE_IDS = [
+  "observatory",
+  "bakery",
+  "greenhouse",
+  "alpine-station",
+  "clockmaker",
+] as const;
+
+export type SoloPuzzleId = (typeof SOLO_PUZZLE_IDS)[number];
 export type PuzzleDifficulty = "UNRATED" | "EASY" | "MEDIUM" | "HARD";
 export type PuzzleRightsStatus = "USER_SUPPLIED" | "VERIFIED" | "RESTRICTED";
 

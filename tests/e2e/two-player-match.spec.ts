@@ -108,6 +108,9 @@ test("the first player to clear the deck wins immediately", async ({ browser }) 
     await expect(first.page.getByTestId("reward-panel")).toContainText("+120");
     await expect(second.page.getByTestId("reward-panel")).toContainText("+40");
     await expect(first.page.getByTestId("player-level")).toContainText("레벨 2");
+    await first.page.getByRole("button", { name: "로비로 돌아가기" }).click();
+    await first.page.getByTestId("me-open").click();
+    await expect(first.page.getByTestId("collection-count")).toHaveText(`${totalPuzzleCount} / ${totalPuzzleCount + 5}`);
   } finally {
     await first.context.close();
     await second.context.close();

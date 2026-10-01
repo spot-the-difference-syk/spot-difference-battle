@@ -1,5 +1,5 @@
 import { GameMatch, GameRuleError, type MatchPuzzle, type PersistedMatchState } from "@spot-battle/game-core";
-import { DEFAULT_MATCH_SETTINGS, GAME_CONFIG, GAME_DIFFICULTIES, GAME_MODES, buyCosmetic, emptyGrowth, equipCosmetic, grantMatchReward, grantSoloReward, growthView, normalizeGrowth, publicCosmetics, type MatchSettings, type PlayerGrowth, type PlayerGrowthPayload } from "@spot-battle/shared";
+import { DEFAULT_MATCH_SETTINGS, GAME_CONFIG, GAME_DIFFICULTIES, GAME_MODES, buyCosmetic, emptyGrowth, equipCosmetic, SOLO_PUZZLE_IDS, grantSoloReward, growthView, matchJourney, settleMatch, normalizeGrowth, publicCosmetics, type MatchSettings, type PlayerGrowth, type PlayerGrowthPayload } from "@spot-battle/shared";
 import { GAME_PUZZLES } from "../../../apps/server/src/game/puzzle-catalog.js";
 
 export interface Storage {
@@ -170,7 +170,7 @@ export class RealtimeGame {
       } else if (event === "shop:buy" || event === "shop:equip") {
         const itemId = string(object(payload), "itemId");
         const growth = this.growthOf(session);
-        const level = growthView(growth).level;
+        const level = growthView(growth, this.now()).level;
         const result = event === "shop:buy" ? buyCosmetic(growth, level, itemId) : equipCosmetic(growth, level, itemId);
         if (!result.ok) throw new GameRuleError(result.code, result.message);
         session.growth = result.growth;
@@ -179,7 +179,8 @@ export class RealtimeGame {
         const input = object(payload);
         if (typeof input.puzzleId !== "string" || typeof input.elapsedMs !== "number") throw new GameRuleError("INVALID_PAYLOAD", "솔로 기록 형식이 올바르지 않습니다.");
         const before = this.growthOf(session);
-        const result = grantSoloReward(before, input.elapsedMs, this.now());
+        const soloId = (SOLO_PUZZLE_IDS as readonly string[]).includes(input.puzzleId) ? input.puzzleId : undefined;
+        const result = grantSoloReward(before, input.elapsedMs, this.now(), soloId);
         if (result.progress !== before) session.growth = result.progress;
         this.emit(peer, "player:growth", this.growthPayload(session, {
           ...(result.reward ? { reward: result.reward } : {}),
@@ -352,7 +353,7 @@ export class RealtimeGame {
   }
 
   private growthPayload(session: Session, extra: Omit<PlayerGrowthPayload, "progress"> = {}): PlayerGrowthPayload {
-    return { progress: growthView(this.growthOf(session)), ...extra };
+    return { progress: growthView(this.growthOf(session), this.now()), ...extra };
   }
 
   /** Grants each finished match once; the growth record remembers rewarded match IDs. */
@@ -361,13 +362,14 @@ export class RealtimeGame {
       const { match } = live;
       if (match.currentState !== "FINISHED") continue;
       const snapshot = match.snapshot();
+      const state = match.serialize();
       for (const player of snapshot.players) {
         const session = this.sessions.get(player.playerId);
         if (!session) continue;
-        const granted = grantMatchReward(this.growthOf(session), match.matchId, snapshot, player.playerId);
-        if (!granted) continue;
-        session.growth = granted.progress;
-        const payload = this.growthPayload(session, { reward: granted.reward, matchId: match.matchId });
+        const settled = settleMatch(this.growthOf(session), match.matchId, snapshot, player.playerId, matchJourney(state, player.playerId), this.now());
+        if (!settled) continue;
+        session.growth = settled.progress;
+        const payload = this.growthPayload(session, { ...(settled.reward ? { reward: settled.reward } : {}), matchId: match.matchId });
         for (const peer of this.peers()) if (peer.playerId === player.playerId) this.emit(peer, "player:growth", payload);
       }
     }

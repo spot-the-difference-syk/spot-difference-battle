@@ -29,26 +29,26 @@ const item = (slot: CosmeticSlot, id: string, name: string, description: string,
 /** 아이템 목록의 정본. 새 아이템은 여기에 추가하고 웹 스타일을 함께 만든다. */
 export const COSMETIC_ITEMS: readonly CosmeticItem[] = [
   item("marker", "marker-viewfinder", "뷰파인더", "기본 정답 표시", 0),
-  item("marker", "marker-ring", "얇은 원", "찾은 곳을 얇은 원으로 표시해요", 200),
+  item("marker", "marker-ring", "얇은 원", "찾은 곳을 얇은 원으로 표시해요", 500),
   item("marker", "marker-gold", "금빛 뷰파인더", "금색 꺾쇠로 표시해요", 0, 3),
-  item("marker", "marker-brush", "붓 동그라미", "손으로 그린 듯한 동그라미", 500),
-  item("marker", "marker-glow", "빛 번짐", "찾은 곳이 은은하게 빛나요", 800, 10),
+  item("marker", "marker-brush", "붓 동그라미", "손으로 그린 듯한 동그라미", 1200),
+  item("marker", "marker-glow", "빛 번짐", "찾은 곳이 은은하게 빛나요", 2000, 10),
 
   item("frame", "frame-none", "액자 없음", "그림만 깔끔하게", 0),
-  item("frame", "frame-wood", "원목 액자", "따뜻한 나무 테두리", 300),
-  item("frame", "frame-mat", "흰 여백", "갤러리처럼 흰 여백을 둘러요", 400),
-  item("frame", "frame-gold", "금빛 액자", "고전 회화 같은 금테", 600, 5),
-  item("frame", "frame-black", "검은 테", "얇고 단단한 검은 테", 800, 8),
+  item("frame", "frame-wood", "원목 액자", "따뜻한 나무 테두리", 800),
+  item("frame", "frame-mat", "흰 여백", "갤러리처럼 흰 여백을 둘러요", 1000),
+  item("frame", "frame-gold", "금빛 액자", "고전 회화 같은 금테", 1500, 5),
+  item("frame", "frame-black", "검은 테", "얇고 단단한 검은 테", 2000, 8),
 
   item("profile", "profile-none", "기본 테두리", "레벨 링만 보여요", 0),
-  item("profile", "profile-sage", "세이지", "차분한 초록 테두리", 300),
-  item("profile", "profile-gold", "금빛 테두리", "반짝이는 금색 테두리", 600, 5),
-  item("profile", "profile-double", "이중 테두리", "두 겹으로 두른 테두리", 900, 10),
+  item("profile", "profile-sage", "세이지", "차분한 초록 테두리", 800),
+  item("profile", "profile-gold", "금빛 테두리", "반짝이는 금색 테두리", 1500, 5),
+  item("profile", "profile-double", "이중 테두리", "두 겹으로 두른 테두리", 2500, 10),
 
   item("title", "title-visitor", "새내기 관람객", "처음 전시를 찾은 관람객", 0),
   item("title", "title-eye", "눈썰미 장인", "레벨 5에 받는 칭호", 0, 5),
-  item("title", "title-detective", "숨은그림 탐정", "작은 차이도 놓치지 않아요", 400),
-  item("title", "title-curator", "갤러리 큐레이터", "레벨 10 이상만 쓸 수 있어요", 1000, 10),
+  item("title", "title-detective", "숨은그림 탐정", "작은 차이도 놓치지 않아요", 1000),
+  item("title", "title-curator", "갤러리 큐레이터", "레벨 10 이상만 쓸 수 있어요", 3000, 10),
 ];
 
 export const COSMETIC_ITEM_BY_ID: Readonly<Record<string, CosmeticItem>> = Object.fromEntries(COSMETIC_ITEMS.map((entry) => [entry.id, entry]));

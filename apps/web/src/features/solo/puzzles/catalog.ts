@@ -11,15 +11,9 @@ import observatoryModified from "@/assets/puzzles/solo/observatory-modified.webp
 import observatoryOriginal from "@/assets/puzzles/solo/observatory-original.webp";
 import { SOLO_ASSET_MANIFEST, type SoloAssetMetadata } from "./manifest";
 
-export const SOLO_PUZZLE_IDS = [
-  "observatory",
-  "bakery",
-  "greenhouse",
-  "alpine-station",
-  "clockmaker",
-] as const;
+import { SOLO_PUZZLE_IDS, type SoloPuzzleId } from "@spot-battle/shared";
 
-export type SoloPuzzleId = (typeof SOLO_PUZZLE_IDS)[number];
+export { SOLO_PUZZLE_IDS, type SoloPuzzleId };
 
 export interface SoloPuzzle {
   id: SoloPuzzleId;

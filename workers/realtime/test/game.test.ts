@@ -179,6 +179,8 @@ describe("Cloudflare authoritative game", () => {
     expect(winnerRewards[0]!.reward).toMatchObject({ reason: "WIN", xp: 100, coins: 120, leveledUp: true });
     expect(winnerRewards[0]!.progress).toMatchObject({ level: 2, coins: 120 });
     expect(growth(first).some((g) => g.reward)).toBe(false);
+    expect(growth(first).at(-1)!.progress.stats).toMatchObject({ matches: 1, losses: 1, wins: 0 });
+    expect(growth(second).at(-1)!.progress.stats).toMatchObject({ matches: 1, wins: 1 });
     const token = h.token(second);
     await h.restore();
     const back = await h.add(token);
@@ -206,7 +208,7 @@ describe("Cloudflare authoritative game", () => {
     await h.restore();
     const rich = await h.add(token);
     await h.game.action(rich, "shop:buy", { itemId: "profile-sage" });
-    expect(growthFrames(rich).at(-1)!.progress).toMatchObject({ coins: 700, loadout: { profile: "profile-sage" } });
+    expect(growthFrames(rich).at(-1)!.progress).toMatchObject({ coins: 200, loadout: { profile: "profile-sage" } });
     await h.game.action(rich, "shop:equip", { itemId: "title-curator" });
     expect(rich.frames.at(-1)).toMatchObject({ event: "game:error", payload: { code: "ITEM_LOCKED" } });
     const opponent = await h.add();

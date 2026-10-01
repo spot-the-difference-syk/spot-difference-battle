@@ -1,10 +1,10 @@
 import type { GrowthView } from "@spot-battle/shared";
-import { House, Minus, Palette, Plus, Timer } from "lucide-react";
+import { House, Minus, Palette, Plus, Timer, User } from "lucide-react";
 import type { ReactNode } from "react";
 import { clampViewport, type ImageViewport } from "../../game/model/image-geometry";
 import { CoinChip, ProfileBadge } from "./Growth";
 
-export type AppTab = "HOME" | "SOLO" | "STYLE";
+export type AppTab = "HOME" | "SOLO" | "STYLE" | "ME";
 
 export const RESET_VIEWPORT: ImageViewport = { scale: 1, pan: { x: 0, y: 0 } };
 
@@ -38,6 +38,7 @@ export function AppHeader({ nickname, growth = null, tab, onTab, trailing }: { n
       <button type="button" aria-current={tab === "HOME" ? "page" : undefined} onClick={() => onTab("HOME")}><House size={20} strokeWidth={1.8}/>홈</button>
       <button type="button" data-testid="solo-mode-open" aria-current={tab === "SOLO" ? "page" : undefined} onClick={() => onTab("SOLO")}><Timer size={20} strokeWidth={1.8}/>혼자 하기</button>
       <button type="button" data-testid="style-open" aria-current={tab === "STYLE" ? "page" : undefined} onClick={() => onTab("STYLE")}><Palette size={20} strokeWidth={1.8}/>꾸미기</button>
+      <button type="button" data-testid="me-open" aria-current={tab === "ME" ? "page" : undefined} onClick={() => onTab("ME")}><User size={20} strokeWidth={1.8}/>내 정보</button>
     </nav>}
     <div className="header-trailing">
       {trailing}

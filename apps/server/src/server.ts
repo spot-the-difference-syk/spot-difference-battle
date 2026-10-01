@@ -9,10 +9,12 @@ import {
   buyCosmetic,
   emptyGrowth,
   equipCosmetic,
-  grantMatchReward,
+  SOLO_PUZZLE_IDS,
   grantSoloReward,
   growthView,
+  matchJourney,
   publicCosmetics,
+  settleMatch,
   type ClientToServerEvents,
   type MatchSettings,
   type PlayerGrowth,
@@ -217,11 +219,12 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
   function rewardIfFinished(match: GameMatch): void {
     if (match.currentState !== "FINISHED") return;
     const snapshot = match.snapshot();
+    const state = match.serialize();
     for (const player of snapshot.players) {
-      const granted = grantMatchReward(growthOf(player.playerId), match.matchId, snapshot, player.playerId);
-      if (!granted) continue;
-      storeGrowth(player.playerId, granted.progress);
-      io.to(player.playerId).emit("player:growth", growthPayload(player.playerId, { reward: granted.reward, matchId: match.matchId }));
+      const settled = settleMatch(growthOf(player.playerId), match.matchId, snapshot, player.playerId, matchJourney(state, player.playerId));
+      if (!settled) continue;
+      storeGrowth(player.playerId, settled.progress);
+      io.to(player.playerId).emit("player:growth", growthPayload(player.playerId, { ...(settled.reward ? { reward: settled.reward } : {}), matchId: match.matchId }));
     }
   }
 
@@ -666,7 +669,8 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
         }
         enforceCooldown("solo");
         const before = growthOf(session.playerId);
-        const result = grantSoloReward(before, input.elapsedMs, Date.now());
+        const soloId = (SOLO_PUZZLE_IDS as readonly string[]).includes(input.puzzleId) ? input.puzzleId : undefined;
+        const result = grantSoloReward(before, input.elapsedMs, Date.now(), soloId);
         if (result.progress !== before) storeGrowth(session.playerId, result.progress);
         socket.emit("player:growth", growthPayload(session.playerId, {
           ...(result.reward ? { reward: result.reward } : {}),

@@ -53,6 +53,8 @@ export function RewardPanel({ reward, note }: { reward: RewardSummary | null | u
     <div className="reward-rows">
       <div className="list-row"><span>경험치</span><b>+{reward.xp}</b></div>
       <div className="list-row"><span className="inline-flex items-center gap-2"><i className="coin-dot" aria-hidden/>코인</span><b>+{reward.coins}</b></div>
+      {reward.dailyGoal && <div data-testid="daily-goal-reward" className="list-row"><span>오늘의 목표 달성 · {reward.dailyGoal.label}</span><b className="text-[var(--gold)]">코인 +{reward.dailyGoal.coins} 포함</b></div>}
+      {reward.newlyCollected?.length ? <div className="list-row"><span>새로 수집한 그림</span><b>{reward.newlyCollected.length}점</b></div> : null}
     </div>
   </section>;
 }
