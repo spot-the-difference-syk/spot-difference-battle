@@ -33,6 +33,7 @@ it("never falls back to code catalog when database startup fails", () => {
       STORAGE_DRIVER: "memory",
       PUZZLE_CATALOG_SOURCE: "database",
       SUPABASE_DB_URL: "postgres://unused:unused@127.0.0.1:1/unused",
+      PUZZLE_ASSET_BASE_URL: "https://images.example.com",
       HOST: "127.0.0.1",
       PORT: "0",
     },

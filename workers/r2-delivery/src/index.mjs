@@ -15,29 +15,23 @@
 const PATH_PATTERN =
   /^\/puzzles\/([a-z0-9][a-z0-9-]*)\/(\d{4}-\d{2}-\d{2}\.\d+)\/runtime\/(original|modified)\.webp$/;
 
-/** 현재 canary 로 서빙하는 퍼즐. 활성 버전 전환은 형주 영역이다. */
-const ALLOWED_ASSETS = new Set([
-  "home-office/2026-08-28.2",
-]);
-
 /**
  * 결과 구분.
  *
  * 없는 객체, 잘못된 버전과 traversal 입력은 구분 가능한 상태 코드로 처리한다.
  *
  *   bad_path       400  경로 형식 위반. traversal·잘못된 버전 형식·알 수 없는 kind
- *   not_allowed    404  형식은 맞지만 서빙 대상이 아닌 puzzleId/assetVersion
- *   asset_missing  502  허용된 경로인데 R2 에 객체가 없다. 업로드 또는 카탈로그 사고
+ *   asset_missing  404  형식은 맞지만 R2 에 객체가 없다. 아직 올리지 않았거나 잘못된 주소
  *
- * 앞의 둘은 정상적인 거부이고 502 만 운영 장애다. 같은 404 로 묶으면
- * 로그에서 사고를 골라낼 수 없다.
+ * 그림은 `pnpm puzzle:publish` 로 R2 에 올리면 코드 수정 없이 바로 서빙된다.
+ * 공개 여부(어떤 그림을 게임에 쓰는지)는 Supabase 카탈로그가 정한다.
+ * 같은 퍼즐이 404 를 계속 내면 카탈로그와 업로드가 어긋난 것이므로 로그로 확인한다.
  */
 const OUTCOME = {
   ok: { status: 200, level: "log" },
   not_modified: { status: 304, level: "log" },
   bad_path: { status: 400, level: "warn", body: "Bad Request" },
-  not_allowed: { status: 404, level: "warn", body: "Not Found" },
-  asset_missing: { status: 502, level: "error", body: "Bad Gateway" },
+  asset_missing: { status: 404, level: "warn", body: "Not Found" },
   internal_error: { status: 500, level: "error", body: "Internal Server Error" },
   method_not_allowed: { status: 405, level: "warn", body: "Method Not Allowed" },
 };
@@ -102,10 +96,6 @@ export async function handleRequest(request, env, options = {}) {
   }
 
   const [, pairId, assetVersion, kind] = match;
-  if (!ALLOWED_ASSETS.has(`${pairId}/${assetVersion}`)) {
-    log("not_allowed", { method, pairId, assetVersion, kind });
-    return respond("not_allowed");
-  }
 
   const key = `puzzles/${pairId}/${assetVersion}/runtime/${kind}.webp`;
   let object;
@@ -116,7 +106,7 @@ export async function handleRequest(request, env, options = {}) {
     return respond("internal_error");
   }
   if (!object) {
-    // 허용 목록에 있는데 객체가 없다. 업로드 누락이거나 카탈로그 불일치다.
+    // 업로드하지 않은 그림이거나 카탈로그와 업로드가 어긋났다.
     log("asset_missing", { method, pairId, assetVersion, kind });
     return respond("asset_missing");
   }
@@ -145,4 +135,4 @@ export async function handleRequest(request, env, options = {}) {
 }
 
 export default { fetch: handleRequest };
-export { createLogger, PATH_PATTERN, ALLOWED_ASSETS };
+export { createLogger, PATH_PATTERN };

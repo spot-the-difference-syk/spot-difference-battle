@@ -11,7 +11,11 @@ export const GAME_PUZZLE_IDS = [
   "laundry-room",
 ] as const;
 
-export type GamePuzzleId = (typeof GAME_PUZZLE_IDS)[number];
+/** 앱 번들에 포함된 대결 그림 ID */
+export type BundledPuzzleId = (typeof GAME_PUZZLE_IDS)[number];
+
+/** 대결 그림 ID. 카탈로그(DB)로 새 그림이 추가되므로 문자열 전체를 허용한다. */
+export type GamePuzzleId = string;
 
 /** 솔로 타임어택 전용 그림. 이미지·정답은 웹 번들에 있고 서버는 수집 기록 검증에만 쓴다. */
 export const SOLO_PUZZLE_IDS = [
@@ -121,4 +125,4 @@ export const GAME_PUZZLE_ASSET_MANIFEST = {
     original: webp("laundry-room-original.webp", "5FE54A914A41A31C1576BA3699728CE1919470DED4DFFE2B2788990994DE7AFA"),
     modified: webp("laundry-room-modified.webp", "863B7E2C0BF13BEDE9A8FB260DDA7413E158E6D6E1ED494C68C68ADAAB0F97AA"),
   },
-} as const satisfies Record<GamePuzzleId, PuzzleAssetMetadata>;
+} as const satisfies Record<BundledPuzzleId, PuzzleAssetMetadata>;

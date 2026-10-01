@@ -2,14 +2,14 @@ import { GAME_DIFFICULTY_RULES, GAME_MODE_RULES, type GameDifficulty, type GameM
 import { Flag, LogOut, WifiOff } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppHeader, BoardPair, PaperScreen, ProgressTrack, RESET_VIEWPORT, Segmented, StageScreen, ZoomControls, type AppTab } from "../features/gallery/components/Gallery";
-import { ArtworkShelf, FeaturedArtwork, featuredArtwork } from "../features/gallery/components/Exhibition";
+import { ArtworkShelf, FeaturedArtwork } from "../features/gallery/components/Exhibition";
+import { featuredVisual, preloadVisual, toVisuals, usePuzzleCatalog } from "../features/catalog/puzzle-catalog";
 import { LevelAvatar, RewardPanel, titleName } from "../features/gallery/components/Growth";
 import { DailyGoal, MyGallery } from "../features/gallery/components/MyGallery";
 import { Wardrobe } from "../features/gallery/components/Wardrobe";
 import { ImageBoard } from "../features/game/components/ImageBoard";
 import { useGameClient } from "../features/game/hooks/use-game-client";
 import { clampViewport, type ImageViewport } from "../features/game/model/image-geometry";
-import { GAME_PUZZLE_VISUALS, preloadPuzzle } from "../features/game/puzzles/catalog";
 import { SoloGame } from "../features/solo/components/SoloGame";
 
 function useRemainingSeconds(deadlineMs: number | null | undefined, serverNow: () => number): number | null {
@@ -55,12 +55,15 @@ export default function App() {
   const [preloadAttempt, setPreloadAttempt] = useState(0);
   const [imageViewport, setImageViewport] = useState<ImageViewport>(RESET_VIEWPORT);
   const loadedKeyRef = useRef<string | null>(null);
-  const featured = useMemo(() => featuredArtwork(), []);
+  const catalog = usePuzzleCatalog();
+  const featured = useMemo(() => featuredVisual(catalog), [catalog]);
+  const deckVisuals = useMemo(() => new Map(toVisuals(game.match?.deck ?? []).map((visual) => [visual.id, visual])), [game.match?.deck]);
+  const visualFor = (id: string) => deckVisuals.get(id) ?? catalog.find((visual) => visual.mode === "battle" && visual.id === id) ?? null;
   const remaining = useRemainingSeconds(game.snapshot?.deadlineMs, game.serverNow);
   const me = game.snapshot?.players.find((player) => player.playerId === game.match?.playerId);
   const opponent = game.snapshot?.players.find((player) => player.playerId !== game.match?.playerId);
   const puzzleId = game.snapshot?.currentPuzzleId ?? null;
-  const puzzle = puzzleId ? GAME_PUZZLE_VISUALS[puzzleId] : null;
+  const puzzle = puzzleId ? visualFor(puzzleId) : null;
   const inputLocked = Boolean(me?.inputLockedUntilMs && me.inputLockedUntilMs > game.serverNow());
   const lockSeconds = GAME_DIFFICULTY_RULES[game.snapshot?.settings?.difficulty ?? "NORMAL"].wrongAnswerLockSeconds;
   const reconnectCount = useRef(0);
@@ -89,7 +92,10 @@ export default function App() {
   useEffect(() => {
     if (!game.snapshot?.currentPuzzleId) return;
     const ids = [game.snapshot.currentPuzzleId, game.snapshot.nextPuzzleId].filter(Boolean) as GamePuzzleId[];
-    const loading = Promise.all(ids.map(preloadPuzzle));
+    const loading = Promise.all(ids.map((id) => {
+      const visual = visualFor(id);
+      return visual ? preloadVisual(visual) : Promise.reject(new Error(`알 수 없는 그림: ${id}`));
+    }));
 
     if (game.snapshot.state !== "PRELOADING" || !game.match) {
       void loading.catch(() => undefined);
@@ -104,15 +110,16 @@ export default function App() {
       .then(() => {
         loadedKeyRef.current = key;
         setPreloadError(null);
-        game.loaded(game.snapshot!.currentPuzzleId!);
+        const current = visualFor(game.snapshot!.currentPuzzleId!);
+        if (current) game.loaded(current.id, current.version);
       })
       .catch(() => setPreloadError("이미지를 불러오지 못했어요. 네트워크를 확인하고 다시 시도해주세요."));
-  }, [game.snapshot?.state, game.snapshot?.currentPuzzleId, game.snapshot?.nextPuzzleId, game.match?.matchId, preloadAttempt, me?.loaded, game.connected]);
+  }, [game.snapshot?.state, game.snapshot?.currentPuzzleId, game.snapshot?.nextPuzzleId, game.match?.matchId, preloadAttempt, me?.loaded, game.connected, deckVisuals]);
 
   const switchTab = (next: AppTab) => { game.clearError(); setTab(next); };
   const loadout = game.growth?.loadout;
 
-  if (game.phase === "NICKNAME") return <PaperScreen ambientSrc={featured.src}>
+  if (game.phase === "NICKNAME") return <PaperScreen ambientSrc={featured.originalSrc}>
     <AppHeader/>
     <section className="center-card fade-up">
       <p className="eyebrow">처음 오셨네요</p>
@@ -129,7 +136,7 @@ export default function App() {
 
   if (tab === "SOLO") return <SoloGame nickname={game.nickname} growth={game.growth} soloResult={game.soloResult} onComplete={game.completeSolo} onTab={switchTab}/>;
 
-  if (game.phase === "LOBBY") return <PaperScreen ambientSrc={featured.src}>
+  if (game.phase === "LOBBY") return <PaperScreen ambientSrc={featured.originalSrc}>
     <div className="has-tabbar">
       <AppHeader nickname={game.nickname} growth={game.growth} tab="HOME" onTab={switchTab}/>
       <div className="lobby-grid fade-up">
@@ -154,7 +161,7 @@ export default function App() {
     </div>
   </PaperScreen>;
 
-  if (game.phase === "MATCHING") return <PaperScreen ambientSrc={featured.src}>
+  if (game.phase === "MATCHING") return <PaperScreen ambientSrc={featured.originalSrc}>
     <AppHeader nickname={game.nickname} growth={game.growth}/>
     <section data-testid="matching-screen" className="center-card fade-up">
       <div className="spinner-ring"/>
@@ -198,7 +205,7 @@ export default function App() {
         </div>
         <ProgressTrack done={me?.completedPuzzleCount ?? 0} total={total} partial={differenceCount ? found / differenceCount : 0}/>
         <div className="play-title">
-          <div className="flex min-w-0 items-baseline gap-2"><h2 className="truncate">{puzzle.label}</h2><span data-testid="puzzle-progress" className="shrink-0 text-xs font-semibold text-white/50">{myPuzzleNumber} / {total}</span></div>
+          <div className="flex min-w-0 items-baseline gap-2"><h2 className="truncate">{puzzle.title}</h2><span data-testid="puzzle-progress" className="shrink-0 text-xs font-semibold text-white/50">{myPuzzleNumber} / {total}</span></div>
           <ZoomControls viewport={imageViewport} onChange={setImageViewport}/>
         </div>
       </div>
@@ -217,7 +224,7 @@ export default function App() {
     <section data-testid="countdown-screen" className="center-card">
       <div key={remaining ?? 0} className="big-number tick">{remaining ?? 0}</div>
       <h1 className="mt-4 text-xl font-bold">곧 시작해요</h1>
-      {puzzle && <p className="mt-1 text-sm text-white/55">첫 그림 · {puzzle.label}</p>}
+      {puzzle && <p className="mt-1 text-sm text-white/55">첫 그림 · {puzzle.title}</p>}
     </section>
     {overlays}
   </StageScreen>;
@@ -225,7 +232,7 @@ export default function App() {
   const iWon = snapshot.winnerId === game.match.playerId;
   const endReason = snapshot.endReason === "COMPLETED" ? "전체 문제 먼저 완료" : snapshot.endReason === "TIMEOUT" ? "제한시간 종료" : snapshot.endReason === "FORFEIT" ? (iWon ? "상대 기권" : "본인 기권") : snapshot.endReason === "MISTAKE_LIMIT" ? (iWon ? "상대 오답 3회" : "오답 3회") : "경기 종료";
 
-  return <PaperScreen ambientSrc={puzzle?.originalSrc ?? featured.src}>
+  return <PaperScreen ambientSrc={puzzle?.originalSrc ?? featured.originalSrc}>
     <AppHeader nickname={game.nickname} growth={game.growth} trailing={forfeitButton}/>
 
     {snapshot.state === "READY" && <section data-testid="ready-screen" className="center-card fade-up">
@@ -247,7 +254,7 @@ export default function App() {
       {preloadError && <div className="mt-6"><p className="font-semibold text-[#c0392b]">{preloadError}</p><button type="button" onClick={() => setPreloadAttempt((value) => value + 1)} className="btn-secondary mt-3">다시 시도</button></div>}
     </section>}
 
-    {snapshot.state === "PLAYING" && !puzzle && <section data-testid="deck-complete-screen" className="center-card fade-up">
+    {snapshot.state === "PLAYING" && !puzzleId && <section data-testid="deck-complete-screen" className="center-card fade-up">
       <p className="eyebrow">모든 그림 완료</p>
       <h1 className="display-title mt-2">{me?.totalFoundCount ?? 0} / {me?.totalDifferenceCount ?? snapshot.totalDifferenceCount}</h1>
       <p className="muted mt-2 text-[15px]">결과를 확인하고 있어요.</p>

@@ -47,10 +47,10 @@ WebSocket Origin은 같은 웹 사이트와 다음 AIT 주소만 허용한다. �
 1. 기존 Supabase 마이그레이션을 적용한다. 이 Worker는 DB 스키마를 변경하지 않는다.
 2. Cloudflare에서 해당 Supabase PostgreSQL에 연결하는 Hyperdrive를 생성한다. 활성 카탈로그를 즉시 읽으려면 Hyperdrive 쿼리 캐시를 비활성화한다.
 3. `workers/realtime/wrangler.toml`의 `[[hyperdrive]]` 예시를 활성화하고 **실제 Hyperdrive ID**를 넣는다. 연결 비밀번호는 저장소·브라우저 환경변수에 넣지 않는다.
-4. DB 퍼즐을 사용할 때만 `PUZZLE_CATALOG_SOURCE="database"`로 변경한다. Hyperdrive 없이는 이 모드로 시작할 수 없다. DB 로딩 실패 시 코드 카탈로그로 자동 전환하지 않는다.
+4. DB 퍼즐을 사용할 때만 `PUZZLE_CATALOG_SOURCE="database"`로 변경한다. Hyperdrive와 `PUZZLE_ASSET_BASE_URL`(R2 배포 Worker 주소) 없이는 이 모드로 시작할 수 없다. 처음 읽기에 실패하면 코드 카탈로그로 자동 전환하지 않는다. 그 뒤 새로 읽기에 실패하면 마지막 정상 목록을 유지한다.
 5. 재배포 후 `/health`의 `database`가 `true`인지 확인한다. 기본 DO 모드에서는 `null`이다.
 
-기존 DB 카탈로그 검증을 재사용하므로 현재 프런트 매니페스트와 ID·버전이 일치해야 한다. DB 카탈로그는 Durable Object가 초기화될 때 로딩된다. 활성 버전 게시 시 프런트와 Worker를 함께 갱신하고 새 초기화 이후 확인한다. DB의 임의 버전을 화면이 자동으로 따라가는 기능은 추가하지 않는다.
+DB 카탈로그는 Durable Object가 5분마다 다시 읽고, 웹은 `GET /catalog`(Worker가 먼저 처리, 60초 캐시)로 활성 목록과 R2 이미지 주소를 받는다. 새 그림은 `pnpm puzzle publish … --upload --activate`로 R2와 DB에 올리면 재배포 없이 나타난다(`docs/GAME_ASSETS.md` 7절). 대결 정답은 `/catalog`에 포함되지 않는다.
 
 종료 경기는 먼저 Durable Object에 저장한다. Supabase 저장이 실패하면 기록을 유지하고 alarm에서 재시도한다. Supabase 저장이 끝나야 활성 기록을 정리한다. 신고는 종료 경기의 저장을 먼저 완료한 뒤 DB에 등록한다. DB 장애 시 신고 오류를 표시해 사용자가 재시도할 수 있다.
 

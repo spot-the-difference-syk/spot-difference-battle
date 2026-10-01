@@ -1,6 +1,6 @@
 import type { DailyGoalView, GrowthView } from "@spot-battle/shared";
 import { Lock } from "lucide-react";
-import { ARTWORKS } from "./Exhibition";
+import { usePuzzleCatalog } from "../../catalog/puzzle-catalog";
 import { AppHeader, PaperScreen, type AppTab } from "./Gallery";
 import { LevelAvatar, XpBar, titleName } from "./Growth";
 
@@ -19,7 +19,9 @@ export function DailyGoal({ goal }: { goal: DailyGoalView }) {
 }
 
 export function MyGallery({ nickname, growth, onTab }: { nickname: string; growth: GrowthView | null; onTab: (tab: AppTab) => void }) {
+  const artworks = usePuzzleCatalog();
   const collected = new Set(growth?.collected ?? []);
+  const collectedHere = artworks.filter((artwork) => collected.has(artwork.key)).length;
   const stats = growth?.stats;
   const winRate = stats && stats.matches ? Math.round((stats.wins / stats.matches) * 100) : 0;
   return <PaperScreen>
@@ -47,12 +49,12 @@ export function MyGallery({ nickname, growth, onTab }: { nickname: string; growt
 
           <div className="mt-8 flex items-baseline justify-between">
             <h2 className="text-[17px] font-extrabold">내 갤러리</h2>
-            <span data-testid="collection-count" className="muted text-[13px] font-semibold">{collected.size} / {ARTWORKS.length}</span>
+            <span data-testid="collection-count" className="muted text-[13px] font-semibold">{collectedHere} / {artworks.length}</span>
           </div>
           <p className="muted mt-1 text-[13px]">대결이나 솔로에서 끝까지 푼 그림이 모여요.</p>
           <div className="collection-grid">
-            {ARTWORKS.map((artwork) => collected.has(artwork.key)
-              ? <figure key={artwork.key} className="collection-item"><img src={artwork.src} alt={artwork.label} loading="lazy"/><figcaption>{artwork.label}</figcaption></figure>
+            {artworks.map((artwork) => collected.has(artwork.key)
+              ? <figure key={artwork.key} className="collection-item"><img src={artwork.originalSrc} alt={artwork.title} loading="lazy"/><figcaption>{artwork.title}</figcaption></figure>
               : <figure key={artwork.key} className="collection-item locked" aria-label="아직 수집하지 않은 그림"><span><Lock size={16}/></span><figcaption>{artwork.genre}</figcaption></figure>)}
           </div>
         </>}

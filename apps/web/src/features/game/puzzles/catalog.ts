@@ -1,6 +1,7 @@
 import {
   GAME_PUZZLE_ASSET_MANIFEST,
-  type GamePuzzleId,
+  BUNDLED_BATTLE_INFO,
+  type BundledPuzzleId,
   type PuzzleAssetMetadata,
 } from "@spot-battle/shared";
 import bathroomVanityModified from "@/assets/puzzles/bathroom-vanity-modified.webp";
@@ -25,7 +26,7 @@ import winterModified from "@/assets/puzzles/winter-cabin-modified.webp";
 import winterOriginal from "@/assets/puzzles/winter-cabin-original.webp";
 
 export interface GamePuzzleVisual {
-  id: GamePuzzleId;
+  id: BundledPuzzleId;
   metadata: PuzzleAssetMetadata;
   label: string;
   originalSrc: string;
@@ -66,86 +67,86 @@ const homeOfficeCanarySource = (
 
 export const createGamePuzzleVisuals = (
   canaryBaseUrl?: string,
-): Readonly<Record<GamePuzzleId, GamePuzzleVisual>> => ({
+): Readonly<Record<BundledPuzzleId, GamePuzzleVisual>> => ({
   "cozy-cafe": {
     id: "cozy-cafe",
     metadata: GAME_PUZZLE_ASSET_MANIFEST["cozy-cafe"],
-    label: "햇살 좋은 카페",
+    label: BUNDLED_BATTLE_INFO["cozy-cafe"].title,
     originalSrc: cafeOriginal,
     modifiedSrc: cafeModified,
-    alt: "꽃병과 고양이가 있는 따뜻한 카페",
+    alt: BUNDLED_BATTLE_INFO["cozy-cafe"].alt,
   },
   "enchanted-forest": {
     id: "enchanted-forest",
     metadata: GAME_PUZZLE_ASSET_MANIFEST["enchanted-forest"],
-    label: "마법의 버섯 숲",
+    label: BUNDLED_BATTLE_INFO["enchanted-forest"].title,
     originalSrc: forestOriginal,
     modifiedSrc: forestModified,
-    alt: "토끼와 버섯집이 있는 마법의 숲",
+    alt: BUNDLED_BATTLE_INFO["enchanted-forest"].alt,
   },
   "underwater-treasure": {
     id: "underwater-treasure",
     metadata: GAME_PUZZLE_ASSET_MANIFEST["underwater-treasure"],
-    label: "바닷속 보물",
+    label: BUNDLED_BATTLE_INFO["underwater-treasure"].title,
     originalSrc: underwaterOriginal,
     modifiedSrc: underwaterModified,
-    alt: "거북이와 보물상자가 있는 바닷속",
+    alt: BUNDLED_BATTLE_INFO["underwater-treasure"].alt,
   },
   "cyber-city": {
     id: "cyber-city",
     metadata: GAME_PUZZLE_ASSET_MANIFEST["cyber-city"],
-    label: "네온 사이버 도시",
+    label: BUNDLED_BATTLE_INFO["cyber-city"].title,
     originalSrc: cityOriginal,
     modifiedSrc: cityModified,
-    alt: "네온 간판과 사람들이 있는 미래 도시",
+    alt: BUNDLED_BATTLE_INFO["cyber-city"].alt,
   },
   "winter-cabin": {
     id: "winter-cabin",
     metadata: GAME_PUZZLE_ASSET_MANIFEST["winter-cabin"],
-    label: "눈 내린 겨울 산장",
+    label: BUNDLED_BATTLE_INFO["winter-cabin"].title,
     originalSrc: winterOriginal,
     modifiedSrc: winterModified,
-    alt: "모닥불과 눈사람이 있는 겨울 산장",
+    alt: BUNDLED_BATTLE_INFO["winter-cabin"].alt,
   },
   "home-office": {
     id: "home-office",
     metadata: GAME_PUZZLE_ASSET_MANIFEST["home-office"],
-    label: "햇살 좋은 홈오피스",
+    label: BUNDLED_BATTLE_INFO["home-office"].title,
     originalSrc: homeOfficeCanarySource("original", homeOfficeOriginal, canaryBaseUrl),
     modifiedSrc: homeOfficeCanarySource("modified", homeOfficeModified, canaryBaseUrl),
-    alt: "노트북과 스탠드가 놓인 햇살 좋은 홈오피스",
+    alt: BUNDLED_BATTLE_INFO["home-office"].alt,
   },
   "farmers-market": {
     id: "farmers-market",
     metadata: GAME_PUZZLE_ASSET_MANIFEST["farmers-market"],
-    label: "정원 농산물 가판대",
+    label: BUNDLED_BATTLE_INFO["farmers-market"].title,
     originalSrc: farmersMarketOriginal,
     modifiedSrc: farmersMarketModified,
-    alt: "꽃과 과일, 채소가 진열된 야외 농산물 가판대",
+    alt: BUNDLED_BATTLE_INFO["farmers-market"].alt,
   },
   "bathroom-vanity": {
     id: "bathroom-vanity",
     metadata: GAME_PUZZLE_ASSET_MANIFEST["bathroom-vanity"],
-    label: "뉴트럴 욕실 세면대",
+    label: BUNDLED_BATTLE_INFO["bathroom-vanity"].title,
     originalSrc: bathroomVanityOriginal,
     modifiedSrc: bathroomVanityModified,
-    alt: "원형 거울과 수건이 있는 뉴트럴톤 욕실 세면대",
+    alt: BUNDLED_BATTLE_INFO["bathroom-vanity"].alt,
   },
   "lakeside-picnic": {
     id: "lakeside-picnic",
     metadata: GAME_PUZZLE_ASSET_MANIFEST["lakeside-picnic"],
-    label: "호숫가 피크닉",
+    label: BUNDLED_BATTLE_INFO["lakeside-picnic"].title,
     originalSrc: lakesidePicnicOriginal,
     modifiedSrc: lakesidePicnicModified,
-    alt: "랜턴과 피크닉 바구니가 놓인 호숫가 나무 테이블",
+    alt: BUNDLED_BATTLE_INFO["lakeside-picnic"].alt,
   },
   "laundry-room": {
     id: "laundry-room",
     metadata: GAME_PUZZLE_ASSET_MANIFEST["laundry-room"],
-    label: "아늑한 세탁실",
+    label: BUNDLED_BATTLE_INFO["laundry-room"].title,
     originalSrc: laundryRoomOriginal,
     modifiedSrc: laundryRoomModified,
-    alt: "세탁기와 다리미판이 있는 밝고 아늑한 세탁실",
+    alt: BUNDLED_BATTLE_INFO["laundry-room"].alt,
   },
 });
 
@@ -153,9 +154,9 @@ export const GAME_PUZZLE_VISUALS = createGamePuzzleVisuals(
   import.meta.env.VITE_R2_CANARY_BASE_URL,
 );
 
-const preloadCache = new Map<GamePuzzleId, Promise<void>>();
+const preloadCache = new Map<BundledPuzzleId, Promise<void>>();
 
-export function preloadPuzzle(puzzleId: GamePuzzleId): Promise<void> {
+export function preloadPuzzle(puzzleId: BundledPuzzleId): Promise<void> {
   const cached = preloadCache.get(puzzleId);
   if (cached) return cached;
 
