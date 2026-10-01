@@ -28,7 +28,7 @@ function pointsForPuzzle(puzzleId: string | null): Array<{ x: number; y: number 
     return point;
   });
 }
-test("one player who clears the deck waits while the opponent is still playing", async ({ browser }) => {
+test("the first player to clear the deck wins immediately", async ({ browser }) => {
   const first = await createPlayer(browser, "빠른사람", { width: 1280, height: 900 });
   const second = await createPlayer(browser, "도전자", { width: 390, height: 844 });
   try {
@@ -54,6 +54,10 @@ test("one player who clears the deck waits while the opponent is still playing",
     ]);
     await expect(first.page.getByRole("img", { name: /원본$/ })).toBeVisible();
     await expect(first.page.getByRole("img", { name: /변경본$/ })).toBeVisible();
+
+    await first.page.getByTestId("original-board").click();
+    await expect(first.page.getByRole("status")).toContainText("수정본에서 선택해주세요");
+    await expect(first.page.getByText(`나 1/${GAME_PUZZLE_IDS.length}번 · 0/3`, { exact: true })).toBeVisible();
 
     const playingScreen = first.page.getByTestId("playing-screen");
     const firstPuzzleId = await playingScreen.getAttribute("data-puzzle-id");
@@ -92,13 +96,9 @@ test("one player who clears the deck waits while the opponent is still playing",
       }
     }
 
-    await expect(first.page.getByTestId("finished-screen")).not.toBeVisible();
-    await expect(first.page.getByTestId("deck-complete-screen")).toContainText("상대가 전체 문제를 완료하면 즉시 결과를 확정합니다");
-    second.page.once("dialog", (dialog) => dialog.accept());
-    await second.page.getByTestId("forfeit-button").click();
-
     await expect(first.page.getByTestId("finished-screen")).toContainText("승리했습니다", { timeout: 5_000 });
     await expect(second.page.getByTestId("finished-screen")).toContainText("패배했습니다", { timeout: 5_000 });
+    await expect(first.page.getByTestId("finished-screen")).toContainText("전체 문제 먼저 완료");
   } finally {
     await first.context.close();
     await second.context.close();

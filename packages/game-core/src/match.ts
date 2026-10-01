@@ -257,8 +257,8 @@ export class GameMatch {
         }
       }
       this.bumpVersion();
-      if (this.players.every((candidate) => candidate.puzzleIndex === this.puzzles.length)) {
-        this.finish(this.determineWinner(), "COMPLETED");
+      if (player.puzzleIndex === this.puzzles.length) {
+        this.finish(playerId, "COMPLETED");
       }
     } else if (!hit) {
       player.wrongAnswerCount += 1;
