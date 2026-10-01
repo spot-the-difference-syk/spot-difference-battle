@@ -13,16 +13,16 @@ export const SOLO_ASSET_MANIFEST = {
     modified: { fileName: "observatory-modified.webp", sha256: "61186E37FEEB0D468E9750EA3E88AC354D48859C491D8FFA8D18099B394EE6A0" },
   },
   bakery: {
-    version: "2026-09-04.1",
+    version: "2026-10-01.1",
     generator: "OpenAI ImageGen",
     original: { fileName: "bakery-original.webp", sha256: "2AB625832819F51498D9777DD30401D722A8533F91C5F30338BBDEE60D41F12F" },
-    modified: { fileName: "bakery-modified.webp", sha256: "A444ECDDA8BB624FF7E6AF2558AD3A6146656E63398B14CA988BC5E8256BEF43" },
+    modified: { fileName: "bakery-modified.webp", sha256: "C1D183D62A2ADD772D627E3B5748B1656EDC18E81C4030B1D7CBF8E274F2AB04" },
   },
   greenhouse: {
-    version: "2026-09-04.1",
+    version: "2026-10-01.1",
     generator: "OpenAI ImageGen",
     original: { fileName: "greenhouse-original.webp", sha256: "58EFA06230EB59AC059CC3EE8DF7BA91116CCAA4D50348D08BECA114D69E9C39" },
-    modified: { fileName: "greenhouse-modified.webp", sha256: "50196D737B96C9AA10E0F80CDC4455633273F71F5E107B2BCCF1F99618AB5C46" },
+    modified: { fileName: "greenhouse-modified.webp", sha256: "7267F64150A8A55AC3CEBE2B0702DB041778A87B80C2564CD8B5A2AD758BAAE6" },
   },
   "alpine-station": {
     version: "2026-09-04.1",
