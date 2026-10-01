@@ -33,7 +33,7 @@ jobs:
       - name: Verify existing AIT bundle
         run: test -f apps/web/spot-difference-syk.ait
 
-  android-wrapper:
+  android-apk:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -56,5 +56,17 @@ jobs:
       - run: pnpm install --no-frozen-lockfile
       - name: Build Android web assets
         run: pnpm package:android:web
-      - name: Validate Gradle wrapper configuration
-        run: grep -q "gradle-8.13-bin.zip" apps/android/gradle/wrapper/gradle-wrapper.properties
+      - name: Setup Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+      - name: Build debug APK
+        run: gradle -p apps/android :app:assembleDebug --no-daemon
+      - name: Verify debug APK
+        run: test -f apps/android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: spot-difference-debug-apk
+          path: apps/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
