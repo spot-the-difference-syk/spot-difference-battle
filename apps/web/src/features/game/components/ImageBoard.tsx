@@ -42,7 +42,7 @@ export function ImageBoard({
   return (
     <div
       data-testid={alt.endsWith("변경본") ? "modified-board" : "original-board"}
-      className={`relative mx-auto aspect-square overflow-hidden rounded-3xl bg-[#0f0e24] shadow-[0_24px_60px_-20px_rgb(0_0_0/0.85)] ring-1 ring-white/10 ${interactive ? "cursor-crosshair" : ""}`}
+      className={`relative aspect-square w-full overflow-hidden rounded-2xl bg-black/30 shadow-[0_24px_48px_-20px_rgb(0_0_0/0.8)] ${interactive ? "cursor-crosshair" : ""}`}
       style={{ touchAction: viewport.scale > 1 ? "none" : "manipulation" }}
       onPointerDown={(event) => {
         if (!interactive || (event.pointerType === "mouse" && event.button !== 0)) return;
@@ -116,16 +116,13 @@ export function ImageBoard({
         {marks.map((mark, index) => (
           <span
             key={`${mark.differenceId}-${index}`}
-            className="found-mark pointer-events-none absolute grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-[3px] border-emerald-300 bg-emerald-400/20 font-black text-white shadow-[0_0_0_3px_rgb(6_78_59/0.55),0_0_24px_rgb(52_211_153/0.7)] [text-shadow:0_1px_3px_rgb(0_0_0/0.6)]"
+            className="viewfinder -translate-x-1/2 -translate-y-1/2"
             style={{
               left: `${mark.region.x * 100}%`,
               top: `${mark.region.y * 100}%`,
-              width: `${mark.region.radius * 200}%`,
-              aspectRatio: "1",
+              width: `${Math.max(mark.region.radius * 200, 8)}%`,
             }}
-          >
-            ✓
-          </span>
+          />
         ))}
       </div>
     </div>

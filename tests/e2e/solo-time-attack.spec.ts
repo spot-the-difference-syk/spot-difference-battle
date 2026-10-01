@@ -30,7 +30,7 @@ test("a solo player can finish five hard differences and keep a personal record"
     await clickNormalized(page, point.x, point.y);
   }
 
-  await expect(page.getByTestId("solo-finished")).toContainText("5개 모두 찾았습니다!");
+  await expect(page.getByTestId("solo-finished")).toContainText("5개 모두 찾았어요!");
   await expect(page.getByTestId("solo-finished")).toContainText("개인 최고기록");
   await page.getByRole("button", { name: "다른 문제" }).click();
   await expect(page.getByText(/최고 \d+\.\d{2}초/)).toHaveCount(1);
