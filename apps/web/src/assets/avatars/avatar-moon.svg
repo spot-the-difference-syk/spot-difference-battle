@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><defs><linearGradient id="moon-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d1838"/><stop offset="1" stop-color="#2c3f78"/></linearGradient><linearGradient id="moon-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7e6b5"/><stop offset=".5" stop-color="#d6ae62"/><stop offset="1" stop-color="#9e7733"/></linearGradient></defs>
+  <rect width="128" height="128" fill="url(#moon-bg)"/>
+  <path d="M78 26a36 36 0 1 0 22 62A30 30 0 1 1 78 26Z" fill="url(#moon-gold)"/>
+  <path d="M30 32l2.5 6 6 2.5-6 2.5L30 49l-2.5-6-6-2.5 6-2.5Z" fill="#fff6d8"/>
+  <path d="M98 30l1.8 4.2 4.2 1.8-4.2 1.8L98 42l-1.8-4.2-4.2-1.8 4.2-1.8Z" fill="#fff6d8"/>
+  <circle cx="40" cy="96" r="1.8" fill="#fff"/><circle cx="104" cy="70" r="1.6" fill="#fff"/><circle cx="22" cy="72" r="1.4" fill="#fff"/>
+  <path d="M14 112c18-10 34-6 50-2s34 6 50-4v22H14Z" fill="#0a1128" opacity=".7"/></svg>

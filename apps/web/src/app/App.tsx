@@ -199,7 +199,7 @@ export default function App() {
         <span className={`play-timer ${remaining !== null && remaining <= 10 ? "danger" : remaining !== null && remaining <= 30 ? "warn" : ""}`}>{remaining === null ? "—" : formatClock(remaining)}</span>
         <div className="flex items-center gap-2">
           <span className="versus" aria-label={`찾은 차이 나 ${me?.totalFoundCount ?? 0}, 상대 ${opponent?.totalFoundCount ?? 0}`}>
-            <LevelAvatar nickname={game.nickname} growth={null} size={28} profile={loadout?.profile}/><span>{me?.totalFoundCount ?? 0}</span><span className="them">{opponent?.totalFoundCount ?? 0}</span><LevelAvatar nickname={opponent?.nickname ?? "?"} growth={null} size={28} profile={game.match.opponentCosmetics?.profile}/>
+            <LevelAvatar nickname={game.nickname} growth={null} size={28} profile={loadout?.profile} avatar={loadout?.avatar}/><span>{me?.totalFoundCount ?? 0}</span><span className="them">{opponent?.totalFoundCount ?? 0}</span><LevelAvatar nickname={opponent?.nickname ?? "?"} growth={null} size={28} profile={game.match.opponentCosmetics?.profile} avatar={game.match.opponentCosmetics?.avatar}/>
           </span>
           {forfeitButton}
         </div>
@@ -239,9 +239,9 @@ export default function App() {
       <p className="eyebrow">상대를 찾았어요</p>
       <h1 className="sr-only">상대: {game.match.opponentNickname}</h1>
       <div className="versus-card">
-        <div className="grid justify-items-center gap-2"><LevelAvatar nickname={game.nickname} growth={null} size={64} profile={loadout?.profile}/><p className="font-bold">{game.nickname}</p><p className="muted text-[12px] font-semibold">{titleName(loadout?.title)}</p></div>
+        <div className="grid justify-items-center gap-2"><LevelAvatar nickname={game.nickname} growth={null} size={64} profile={loadout?.profile} avatar={loadout?.avatar}/><p className="font-bold">{game.nickname}</p><p className="muted text-[12px] font-semibold">{titleName(loadout?.title)}</p></div>
         <span className="vs">대</span>
-        <div className="grid justify-items-center gap-2"><LevelAvatar nickname={game.match.opponentNickname} growth={null} size={64} profile={game.match.opponentCosmetics?.profile}/><p className="font-bold">{game.match.opponentNickname}</p><p className="muted text-[12px] font-semibold">{titleName(game.match.opponentCosmetics?.title)}</p></div>
+        <div className="grid justify-items-center gap-2"><LevelAvatar nickname={game.match.opponentNickname} growth={null} size={64} profile={game.match.opponentCosmetics?.profile} avatar={game.match.opponentCosmetics?.avatar}/><p className="font-bold">{game.match.opponentNickname}</p><p className="muted text-[12px] font-semibold">{titleName(game.match.opponentCosmetics?.title)}</p></div>
       </div>
       <p className="muted mt-6 text-[15px]">두 사람 모두 같은 그림을 동시에 풀어요.</p>
       <button data-testid="ready-button" type="button" disabled={me?.ready} onClick={game.ready} className="btn-primary mt-6 w-full">{me?.ready ? "준비 완료 · 상대를 기다리는 중" : "준비 완료"}</button>

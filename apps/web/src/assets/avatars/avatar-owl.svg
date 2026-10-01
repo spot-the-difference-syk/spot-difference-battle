@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><defs><radialGradient id="owl-bg" cx=".35" cy=".3" r=".85"><stop offset="0" stop-color="#3d3a73"/><stop offset="1" stop-color="#16142e"/></radialGradient><linearGradient id="owl-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7e6b5"/><stop offset=".5" stop-color="#d6ae62"/><stop offset="1" stop-color="#9e7733"/></linearGradient></defs>
+  <rect width="128" height="128" fill="url(#owl-bg)"/>
+  <circle cx="98" cy="28" r="2" fill="#fff"/><circle cx="24" cy="36" r="1.6" fill="#fff"/><circle cx="108" cy="58" r="1.4" fill="#fff"/>
+  <path d="M30 104c-4-36 6-62 34-62s38 26 34 62Z" fill="#8a6a4a"/>
+  <path d="M36 46 30 30l18 10Zm56 0 6-16-18 10Z" fill="#8a6a4a"/>
+  <path d="M44 88c4 10 36 10 40 0" fill="#c9a983"/>
+  <circle cx="50" cy="62" r="14" fill="#f3e6cf"/><circle cx="78" cy="62" r="14" fill="#f3e6cf"/>
+  <circle cx="50" cy="62" r="8" fill="url(#owl-gold)"/><circle cx="78" cy="62" r="8" fill="url(#owl-gold)"/>
+  <circle cx="50" cy="62" r="4" fill="#1b1b1b"/><circle cx="78" cy="62" r="4" fill="#1b1b1b"/>
+  <path d="M60 72h8l-4 8Z" fill="#e0a43c"/>
+  <path d="M40 104h48" stroke="#3a2a1a" stroke-width="5" stroke-linecap="round"/></svg>
