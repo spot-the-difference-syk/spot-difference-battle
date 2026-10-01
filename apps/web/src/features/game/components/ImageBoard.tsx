@@ -45,7 +45,7 @@ export function ImageBoard({
   return (
     <div
       data-testid={alt.endsWith("변경본") ? "modified-board" : "original-board"}
-      className={`relative aspect-square w-full overflow-hidden rounded-2xl bg-black/30 shadow-[0_24px_48px_-20px_rgb(0_0_0/0.8)] ${interactive ? "cursor-crosshair" : ""}`}
+      className={`relative aspect-square w-full overflow-hidden rounded-2xl bg-black/30 shadow-[0_24px_48px_-20px_rgb(0_0_0/0.8)] ${onSelect ? "board-find" : viewport.scale > 1 ? "board-pan" : ""}`}
       style={{ touchAction: viewport.scale > 1 ? "none" : "manipulation" }}
       onPointerDown={(event) => {
         if (!interactive || (event.pointerType === "mouse" && event.button !== 0)) return;
