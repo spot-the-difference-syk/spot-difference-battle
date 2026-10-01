@@ -1,5 +1,4 @@
 import cors from "@fastify/cors";
-import fastifyStatic from "@fastify/static";
 import { GameMatch, GameRuleError, type MatchPuzzle } from "@spot-battle/game-core";
 import {
   DEFAULT_MATCH_SETTINGS,
@@ -36,8 +35,6 @@ import { CatalogService, codeCatalog } from "./game/catalog-service.js";
 export interface GameServerOptions {
   webOrigin?: string | RegExp;
   logger?: boolean;
-  /** Built web client directory to serve from the same origin in production. */
-  staticRoot?: string;
   reconnectGraceMs?: number;
   inputCooldownMs?: number;
   /** 종료 결과 재조회·신고를 허용한 뒤 서버 메모리에서 경기를 제거하기까지의 시간. */
@@ -112,16 +109,10 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
   const catalog = catalogService.catalog.battle;
   if (!catalog.length) throw new Error("Puzzle catalog is empty.");
   const requestedPuzzle = options.sceneId ? catalog.find((puzzle) => puzzle.id === options.sceneId) : undefined;
-  if (options.puzzles && options.sceneId && !requestedPuzzle) throw new Error("Requested scene is absent from the active catalog.");
+  if (options.sceneId && !requestedPuzzle) throw new Error(`GAME_SCENE_ID "${options.sceneId}" is absent from the active catalog.`);
   const app = Fastify({ logger: options.logger ?? false });
   if (options.webOrigin) {
     await app.register(cors, { origin: options.webOrigin });
-  }
-  if (options.staticRoot) {
-    await app.register(fastifyStatic, {
-      root: options.staticRoot,
-      index: ["index.html"],
-    });
   }
   const matchStore = options.matchStore ?? new InMemoryMatchStore();
   app.get("/catalog", async (_request, reply) => {

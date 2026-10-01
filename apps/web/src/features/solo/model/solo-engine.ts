@@ -2,7 +2,7 @@ import type { NormalizedPoint } from "@spot-battle/shared";
 
 export const SOLO_DIFFERENCE_COUNT = 5;
 export const SOLO_WRONG_PENALTY_MS = 3_000;
-export const SOLO_TOUCH_TARGET_RADIUS_PX = 24;
+const SOLO_TOUCH_TARGET_RADIUS_PX = 24;
 
 export type SoloRegion = NormalizedPoint & { radius: number };
 

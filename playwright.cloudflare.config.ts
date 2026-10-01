@@ -13,6 +13,6 @@ export default defineConfig({
     url: "http://127.0.0.1:8787/health",
     reuseExistingServer: false,
     timeout: 120_000,
-    env: { VITE_R2_CANARY_BASE_URL: "", WRANGLER_SEND_METRICS: "false" },
+    env: { WRANGLER_SEND_METRICS: "false" },
   },
 });

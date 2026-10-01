@@ -1,12 +1,12 @@
 import { GameMatch, GameRuleError, type MatchPuzzle, type PersistedMatchState } from "@spot-battle/game-core";
 import type { MatchSettings } from "@spot-battle/shared";
-import { ACTIVE_GAME_PUZZLES, shuffledGamePuzzles } from "./puzzle-catalog.js";
+import { GAME_PUZZLES, shuffledGamePuzzles } from "./puzzle-catalog.js";
 
 export class MatchRegistry {
   private readonly matches = new Map<string, GameMatch>();
   private readonly playerMatches = new Map<string, string>();
 
-  constructor(private readonly puzzles: readonly MatchPuzzle[] = ACTIVE_GAME_PUZZLES) {
+  constructor(private readonly puzzles: readonly MatchPuzzle[] = GAME_PUZZLES) {
     if (puzzles.length === 0) throw new Error("하나 이상의 게임 문제가 필요합니다.");
   }
 
@@ -16,7 +16,7 @@ export class MatchRegistry {
     settings?: MatchSettings,
     deck?: MatchPuzzle[],
   ): GameMatch {
-    const selected = deck ?? (this.puzzles === ACTIVE_GAME_PUZZLES ? shuffledGamePuzzles() : structuredClone(this.puzzles) as MatchPuzzle[]);
+    const selected = deck ?? (this.puzzles === GAME_PUZZLES ? shuffledGamePuzzles() : structuredClone(this.puzzles) as MatchPuzzle[]);
     const match = new GameMatch(matchId, selected, players, undefined, settings);
     this.matches.set(matchId, match);
     for (const player of players) this.playerMatches.set(player.playerId, matchId);

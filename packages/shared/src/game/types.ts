@@ -1,5 +1,5 @@
 import type { GamePuzzleId } from "../puzzles/asset-manifest.js";
-import type { GameSceneId, MatchSettings } from "./config.js";
+import type { MatchSettings } from "./config.js";
 
 export type GameState =
   | "LOBBY"
@@ -91,7 +91,7 @@ export interface GameSnapshot {
   state: GameState;
   stateVersion: number;
   settings?: MatchSettings;
-  imageId: GameSceneId;
+  imageId: GamePuzzleId;
   currentPuzzleId: GamePuzzleId | null;
   currentPuzzleVersion: string | null;
   nextPuzzleId: GamePuzzleId | null;

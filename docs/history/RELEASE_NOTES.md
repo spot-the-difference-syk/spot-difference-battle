@@ -1,5 +1,7 @@
 # 변경 이력
 
+> 문서 상태: HISTORICAL
+
 
 이 프로젝트의 주요 변경 사항을 기록합니다.
 
@@ -10,7 +12,7 @@
 과거 버전은 당시 구현을 설명하는 역사 기록이며 규칙 문서가 아닙니다. 현재 게임 규칙의 유일한 Markdown 정본은 `docs/GAME_RULES.md`이고, `docs/MVP_DECISIONS.md`는 결정 근거만 기록합니다.
 
 
-## [Unreleased]
+## [Unreleased — 2026-08 기준, 이후 변경은 MVP_DECISIONS.md 변경 이력 참고]
 
 
 ### 전체 완료 즉시 종료 및 시간 가산점

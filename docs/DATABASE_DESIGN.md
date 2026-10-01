@@ -1,13 +1,20 @@
 # 게임 데이터베이스 설계
 
 > 문서 상태: CURRENT  
-> 기준일: 2026-09-13
+> 기준일: 2026-10-01
 
 ## 목표
 
-Supabase 프로젝트 `usigggufvapufvbyugbr`의 PostgreSQL 한 곳에서 경쟁전 복구, 결과 조회, 신고 검토와 퍼즐 교체를 관리한다.
+Supabase 프로젝트 `usigggufvapufvbyugbr`의 PostgreSQL 한 곳에서 결과 조회, 신고 검토, 그림 목록과 성장 기록 백업을 관리한다. 운영 Worker는 Hyperdrive로 연결한다.
 조회가 잦은 결과 값만 일반 열로 두고, 버전이 자주 바뀌는 경기 내부 상태와 퍼즐 정답은
-JSONB 스냅샷으로 보존한다. 솔로 타임어택은 현재 규칙대로 기기 로컬 저장만 사용한다.
+JSONB 스냅샷으로 보존한다. 솔로 최고 기록은 기기 로컬에만 저장하고, 솔로 보상·수집은 `player_growth`에 반영된다.
+
+| 테이블 | 운영 Worker | 로컬 Node 개발 서버 |
+|---|---|---|
+| `guest_sessions`, `active_matches` | 쓰지 않음(Durable Object에 보관) | 사용 |
+| `matches`, `match_players`, `reports` | 사용 | 사용 |
+| `puzzle_catalog` | database 모드에서 읽음 | database 모드에서 읽음 |
+| `player_growth` | 성장 기록 백업·복원 | 사용 |
 
 ## 테이블
 
@@ -52,9 +59,7 @@ JSONB 스냅샷으로 보존한다. 솔로 타임어택은 현재 규칙대로 �
 정답 영역 JSON, 난이도와 라이선스 메타데이터를 보존한다. 같은 퍼즐 ID에서는 한 버전만
 활성화할 수 있다.
 
-현재 서버의 코드 카탈로그를 바로 제거하지는 않는다. 운영 퍼즐을 DB로 옮길 때 데이터를
-이 테이블에 입력하고 저장소 구현만 교체한다. 경기 결과는 계속 `puzzle_manifest`에 사본을
-남긴다.
+`metadata`에는 `{mode: "battle"|"solo", genre, alt, original_sha256, modified_sha256}`를 둔다. 행은 그림 등록 도구(`pnpm puzzle`)로 넣고, 노출 전환은 `activate_puzzle_version` 함수와 전체 목록 재검증으로 한다. 서버는 활성 행을 5분마다 다시 읽는다. 경기 결과는 계속 `puzzle_manifest`에 사본을 남긴다.
 
 ### `player_growth`
 
@@ -82,6 +87,8 @@ guest_sessions     active_matches
                 └─────────< reports
 
 puzzle_catalog ──(버전 선택)──> matches.puzzle_manifest 사본
+
+player_growth (player_id, token_hash) — 게스트 토큰 해시로 성장 기록 복원
 ```
 
 ## 유지보수 원칙

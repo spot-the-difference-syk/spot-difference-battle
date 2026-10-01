@@ -1,7 +1,7 @@
 import { BUNDLED_SOLO_PUZZLES, bundledPuzzleCards, type PuzzleCard } from "@spot-battle/shared";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { SOLO_ASSET_MANIFEST } from "../solo/puzzles/manifest";
-import { BUNDLED_VISUALS, fetchCatalog, featuredVisual, toVisual } from "./puzzle-catalog";
+import { BUNDLED_VISUALS, fetchCatalog, featuredVisual, preloadVisual, toVisual } from "./puzzle-catalog";
 
 const remote: PuzzleCard = {
   id: "night-market",
@@ -38,5 +38,39 @@ describe("puzzle catalog on the web", () => {
     await expect(fetchCatalog("https://game.example.com", failing as unknown as typeof fetch)).rejects.toThrow("503");
     const empty = vi.fn(async () => new Response(JSON.stringify({ puzzles: [] }), { status: 200 }));
     await expect(fetchCatalog("https://game.example.com", empty as unknown as typeof fetch)).rejects.toThrow("empty");
+  });
+});
+
+describe("image preloading", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function stubImages(fail: () => boolean) {
+    const loaded: string[] = [];
+    vi.stubGlobal("Image", class {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(value: string) {
+        loaded.push(value);
+        queueMicrotask(() => (fail() ? this.onerror?.() : this.onload?.()));
+      }
+    });
+    return loaded;
+  }
+
+  it("loads both images once and shares the promise between callers", async () => {
+    const loaded = stubImages(() => false);
+    const visual = { originalSrc: "https://img.example/a-original.webp", modifiedSrc: "https://img.example/a-modified.webp" };
+    await Promise.all([preloadVisual(visual), preloadVisual(visual)]);
+    expect(loaded).toEqual([visual.originalSrc, visual.modifiedSrc]);
+  });
+
+  it("forgets a failed image so the next attempt retries it", async () => {
+    let failing = true;
+    const loaded = stubImages(() => failing);
+    const visual = { originalSrc: "https://img.example/b-original.webp", modifiedSrc: "https://img.example/b-modified.webp" };
+    await expect(preloadVisual(visual)).rejects.toThrow("이미지를 불러오지 못했어요");
+    failing = false;
+    await expect(preloadVisual(visual)).resolves.toBeUndefined();
+    expect(loaded.filter((src) => src === visual.originalSrc)).toHaveLength(2);
   });
 });

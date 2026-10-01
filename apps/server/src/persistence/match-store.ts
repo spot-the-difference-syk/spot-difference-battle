@@ -315,6 +315,3 @@ export class SupabasePostgresMatchStore implements MatchStore {
     await this.pool.end();
   }
 }
-
-/** @deprecated SupabasePostgresMatchStore를 사용한다. */
-export class PostgresMatchStore extends SupabasePostgresMatchStore {}

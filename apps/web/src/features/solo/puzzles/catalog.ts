@@ -46,24 +46,3 @@ export const SOLO_PUZZLES: readonly SoloPuzzle[] = BUNDLED_SOLO_PUZZLES.map((puz
 export const SOLO_PUZZLE_BY_ID = Object.fromEntries(
   SOLO_PUZZLES.map((puzzle) => [puzzle.id, puzzle]),
 ) as Readonly<Record<SoloPuzzleId, SoloPuzzle>>;
-
-const preloadCache = new Map<SoloPuzzleId, Promise<void>>();
-
-export function preloadSoloPuzzle(puzzleId: SoloPuzzleId): Promise<void> {
-  const cached = preloadCache.get(puzzleId);
-  if (cached) return cached;
-  const puzzle = SOLO_PUZZLE_BY_ID[puzzleId];
-  const loading = Promise.all(
-    [puzzle.originalSrc, puzzle.modifiedSrc].map((src) => new Promise<void>((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => resolve();
-      image.onerror = () => reject(new Error(`${puzzle.label} 이미지를 불러오지 못했습니다.`));
-      image.src = src;
-    })),
-  ).then(() => undefined).catch((error: unknown) => {
-    preloadCache.delete(puzzleId);
-    throw error;
-  });
-  preloadCache.set(puzzleId, loading);
-  return loading;
-}

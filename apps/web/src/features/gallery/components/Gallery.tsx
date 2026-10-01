@@ -71,10 +71,6 @@ export function BoardPair({ original, modified, modifiedTag = "여기서 찾기"
   </div>;
 }
 
-export function FoundDots({ found, total }: { found: number; total: number }) {
-  return <span className="found-dots" aria-hidden>{Array.from({ length: total }, (_, index) => <i key={index} className={index < found ? "on" : ""}/>)}</span>;
-}
-
 export function ProgressTrack({ done, total, partial = 0 }: { done: number; total: number; partial?: number }) {
   return <div className="progress-track" aria-hidden>{Array.from({ length: total }, (_, index) => <i key={index} style={{ ["--fill" as string]: index < done ? "100%" : index === done ? `${Math.round(partial * 100)}%` : "0%" }}/>)}</div>;
 }
