@@ -5,6 +5,7 @@ import type {
   GameState,
   NormalizedPoint,
 } from "../game/types.js";
+import type { PublicCosmetics } from "../game/cosmetics.js";
 import type { PlayerGrowthPayload } from "../game/progression.js";
 import type { GamePuzzleId } from "../puzzles/asset-manifest.js";
 
@@ -12,6 +13,8 @@ export interface MatchFoundPayload {
   matchId: string;
   playerId: string;
   opponentNickname: string;
+  /** 상대의 프로필 테두리와 칭호 */
+  opponentCosmetics?: PublicCosmetics;
 }
 
 export interface SessionReadyPayload {
@@ -86,4 +89,8 @@ export interface ClientToServerEvents {
   }) => void;
   /** 솔로 타임어택 완주. 서버가 하루 한도 안에서 보상한다. */
   "solo:complete": (payload: { puzzleId: string; elapsedMs: number }) => void;
+  /** 꾸미기 아이템을 코인으로 사고 바로 착용한다. */
+  "shop:buy": (payload: { itemId: string }) => void;
+  /** 가지고 있는 꾸미기 아이템을 착용한다. */
+  "shop:equip": (payload: { itemId: string }) => void;
 }

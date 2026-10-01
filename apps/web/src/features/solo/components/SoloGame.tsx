@@ -5,6 +5,7 @@ import {
   type ImageSelectionContext,
 } from "../../game/components/ImageBoard";
 import { clampViewport, type ImageViewport } from "../../game/model/image-geometry";
+import { LogOut } from "lucide-react";
 import { RewardPanel } from "../../gallery/components/Growth";
 import { AppHeader, BoardPair, PaperScreen, ProgressTrack, StageScreen, ZoomControls, type AppTab } from "../../gallery/components/Gallery";
 import {
@@ -217,7 +218,7 @@ export function SoloGame({ nickname, growth, soloResult, onComplete, onTab }: {
   return <StageScreen ambientSrc={puzzle.originalSrc} testId="solo-playing">
     <div className="play-hud">
       <span data-testid="solo-timer" className="play-timer">{formatSoloTime(runningMs)}</span>
-      <div className="flex items-center gap-2"><span className="pill">발견 {foundIds.length}/{SOLO_DIFFERENCE_COUNT}</span><span className={`pill ${wrongAnswers ? "bad" : ""}`}>오답 {wrongAnswers}</span></div>
+      <div className="flex items-center gap-2"><span className="pill">발견 {foundIds.length}/{SOLO_DIFFERENCE_COUNT}</span><span className={`pill ${wrongAnswers ? "bad" : ""}`}>오답 {wrongAnswers}</span><button type="button" aria-label="그만하기" className="icon-button" onClick={returnToSelection}><LogOut size={17}/></button></div>
       <ProgressTrack done={foundIds.length} total={SOLO_DIFFERENCE_COUNT}/>
       <div className="play-title">
         <h2 className="truncate">{puzzle.label}</h2>
@@ -225,8 +226,9 @@ export function SoloGame({ nickname, growth, soloResult, onComplete, onTab }: {
       </div>
     </div>
     <BoardPair
+      frame={growth?.loadout.frame}
       original={<ImageBoard src={puzzle.originalSrc} alt={`${puzzle.alt} 원본`} viewport={viewport} onPanBy={panImages}/>}
-      modified={<ImageBoard src={puzzle.modifiedSrc} alt={`${puzzle.alt} 변경본`} marks={marks} viewport={viewport} onPanBy={panImages} onSelect={selectPoint}/>}
+      modified={<ImageBoard src={puzzle.modifiedSrc} alt={`${puzzle.alt} 변경본`} marks={marks} markStyle={growth?.loadout.marker} viewport={viewport} onPanBy={panImages} onSelect={selectPoint}/>}
       overlay={feedback && <span key={`${foundIds.length}-${wrongAnswers}`} className={`board-toast fade-up ${feedback.startsWith("정답") ? "" : "bad"}`}>{feedback}</span>}
     />
   </StageScreen>;

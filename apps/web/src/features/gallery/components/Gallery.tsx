@@ -1,10 +1,10 @@
 import type { GrowthView } from "@spot-battle/shared";
-import { House, Minus, Plus, Timer } from "lucide-react";
+import { House, Minus, Palette, Plus, Timer } from "lucide-react";
 import type { ReactNode } from "react";
 import { clampViewport, type ImageViewport } from "../../game/model/image-geometry";
 import { CoinChip, ProfileBadge } from "./Growth";
 
-export type AppTab = "HOME" | "SOLO";
+export type AppTab = "HOME" | "SOLO" | "STYLE";
 
 export const RESET_VIEWPORT: ImageViewport = { scale: 1, pan: { x: 0, y: 0 } };
 
@@ -37,6 +37,7 @@ export function AppHeader({ nickname, growth = null, tab, onTab, trailing }: { n
     {tab && onTab && <nav className="app-nav" aria-label="메뉴">
       <button type="button" aria-current={tab === "HOME" ? "page" : undefined} onClick={() => onTab("HOME")}><House size={20} strokeWidth={1.8}/>홈</button>
       <button type="button" data-testid="solo-mode-open" aria-current={tab === "SOLO" ? "page" : undefined} onClick={() => onTab("SOLO")}><Timer size={20} strokeWidth={1.8}/>혼자 하기</button>
+      <button type="button" data-testid="style-open" aria-current={tab === "STYLE" ? "page" : undefined} onClick={() => onTab("STYLE")}><Palette size={20} strokeWidth={1.8}/>꾸미기</button>
     </nav>}
     <div className="header-trailing">
       {trailing}
@@ -62,10 +63,10 @@ export function ZoomControls({ viewport, onChange }: { viewport: ImageViewport; 
 }
 
 /** 원본과 수정본을 항상 같은 크기로 놓는다. 세로 화면은 위아래, 넓은 화면은 좌우. */
-export function BoardPair({ original, modified, modifiedTag = "여기서 찾기", overlay }: { original: ReactNode; modified: ReactNode; modifiedTag?: ReactNode; overlay?: ReactNode }) {
+export function BoardPair({ original, modified, modifiedTag = "여기서 찾기", overlay, frame = "frame-none" }: { original: ReactNode; modified: ReactNode; modifiedTag?: ReactNode; overlay?: ReactNode; frame?: string }) {
   return <div className="board-pair">
-    <figure className="board-slot"><figcaption className="board-tag">원본</figcaption>{original}</figure>
-    <figure className="board-slot"><figcaption className="board-tag">{modifiedTag}</figcaption>{modified}{overlay}</figure>
+    <figure className={`board-slot ${frame}`}><figcaption className="board-tag">원본</figcaption>{original}</figure>
+    <figure className={`board-slot ${frame}`}><figcaption className="board-tag">{modifiedTag}</figcaption>{modified}{overlay}</figure>
   </div>;
 }
 

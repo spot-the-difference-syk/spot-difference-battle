@@ -18,6 +18,8 @@ interface ImageBoardProps {
   onSelect?: (point: NormalizedPoint, context: ImageSelectionContext) => void;
   viewport: ImageViewport;
   onPanBy: (delta: NormalizedPoint) => void;
+  /** 착용한 정답 표시 아이템 ID */
+  markStyle?: string;
 }
 
 export function ImageBoard({
@@ -27,6 +29,7 @@ export function ImageBoard({
   onSelect,
   viewport,
   onPanBy,
+  markStyle = "marker-viewfinder",
 }: ImageBoardProps) {
   const imageRef = useRef<HTMLImageElement | null>(null);
   const gestureRef = useRef<{
@@ -116,7 +119,7 @@ export function ImageBoard({
         {marks.map((mark, index) => (
           <span
             key={`${mark.differenceId}-${index}`}
-            className="viewfinder -translate-x-1/2 -translate-y-1/2"
+            className={`found-mark ${markStyle} -translate-x-1/2 -translate-y-1/2`}
             style={{
               left: `${mark.region.x * 100}%`,
               top: `${mark.region.y * 100}%`,

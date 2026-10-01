@@ -6,10 +6,13 @@ import {
   GAME_CONFIG,
   GAME_DIFFICULTIES,
   GAME_MODES,
+  buyCosmetic,
   emptyGrowth,
+  equipCosmetic,
   grantMatchReward,
   grantSoloReward,
   growthView,
+  publicCosmetics,
   type ClientToServerEvents,
   type MatchSettings,
   type PlayerGrowth,
@@ -201,6 +204,10 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
     return { progress: growthView(growthOf(playerId)), ...extra };
   }
 
+  function opponentCosmetics(opponentId: string | undefined) {
+    return publicCosmetics(growthOf(opponentId ?? "").loadout);
+  }
+
   function hasProtectedGrowth(playerId: string, now: number): boolean {
     const session = sessions.getByPlayer(playerId);
     return (growthByPlayer.get(playerId)?.totalXp ?? 0) > 0 && !!session && now - session.lastSeenAt < growthRetentionMs;
@@ -365,6 +372,7 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
       matchId: match.matchId,
       playerId: session.playerId,
       opponentNickname: opponent?.nickname ?? "상대",
+      opponentCosmetics: opponentCosmetics(opponent?.playerId),
     });
     emitSnapshots(match);
   }
@@ -515,11 +523,13 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
           matchId,
           playerId: session.playerId,
           opponentNickname: waitingPlayer.nickname,
+          opponentCosmetics: opponentCosmetics(waitingPlayer.playerId),
         });
         opponentSocket.emit("match:found", {
           matchId,
           playerId: waitingPlayer.playerId,
           opponentNickname: normalizedNickname,
+          opponentCosmetics: opponentCosmetics(session.playerId),
         });
         emitSnapshots(match);
         waitingPlayers.delete(key);
@@ -666,6 +676,23 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
         emitGameError(socket, error);
       }
     });
+
+    for (const event of ["shop:buy", "shop:equip"] as const) {
+      socket.on(event, (payload) => {
+        try {
+          const itemId = requireStringField(payload, "itemId");
+          enforceCooldown("shop");
+          const growth = growthOf(session.playerId);
+          const level = growthView(growth).level;
+          const result = event === "shop:buy" ? buyCosmetic(growth, level, itemId) : equipCosmetic(growth, level, itemId);
+          if (!result.ok) throw new GameRuleError(result.code, result.message);
+          storeGrowth(session.playerId, result.growth);
+          socket.emit("player:growth", growthPayload(session.playerId));
+        } catch (error) {
+          emitGameError(socket, error);
+        }
+      });
+    }
 
     socket.on("disconnect", () => {
       if (session.socketId !== socket.id) return;

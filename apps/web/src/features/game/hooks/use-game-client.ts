@@ -162,6 +162,14 @@ export function useGameClient() {
     matchRewards,
     /** 마지막 솔로 완주 보상 결과 */
     soloResult,
+    buyItem: (itemId: string) => {
+      setError(null);
+      socketRef.current?.emit("shop:buy", { itemId });
+    },
+    equipItem: (itemId: string) => {
+      setError(null);
+      socketRef.current?.emit("shop:equip", { itemId });
+    },
     completeSolo: (puzzleId: string, elapsedMs: number) => {
       soloPendingRef.current = true;
       setSoloResult(null);

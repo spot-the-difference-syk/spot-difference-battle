@@ -45,5 +45,10 @@ test("a solo player can finish five hard differences and keep a personal record"
   await expect(page.getByText("오답 0", { exact: true })).toBeVisible();
   await clickNormalized(page, 0.72, 0.31);
   await expect(page.getByText("발견 1/5", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "그만하기" }).click();
+  await page.getByTestId("style-open").click();
+  await expect(page.getByRole("heading", { name: "나만의 전시 스타일" })).toBeVisible();
+  await page.getByRole("button", { name: /얇은 원/ }).click();
+  await expect(page.getByText("코인이 180개 부족해요")).toBeVisible();
   expect(pageErrors).toEqual([]);
 });

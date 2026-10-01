@@ -1,4 +1,4 @@
-import type { GrowthView, RewardSummary } from "@spot-battle/shared";
+import { COSMETIC_ITEM_BY_ID, type GrowthView, type RewardSummary } from "@spot-battle/shared";
 
 const RING_RADIUS = 22.5;
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
@@ -8,9 +8,13 @@ function levelRatio(growth: GrowthView): number {
 }
 
 /** 프로필 사진 둘레가 다음 레벨까지 차오른다. */
-export function LevelAvatar({ nickname, growth, size = 38 }: { nickname: string; growth: GrowthView | null; size?: number }) {
+export function titleName(titleId: string | undefined): string {
+  return (titleId && COSMETIC_ITEM_BY_ID[titleId]?.name) || "";
+}
+
+export function LevelAvatar({ nickname, growth, size = 38, profile }: { nickname: string; growth: GrowthView | null; size?: number; profile?: string }) {
   const filled = growth ? levelRatio(growth) * RING_LENGTH : 0;
-  return <span className="level-avatar" style={{ width: size, height: size }}>
+  return <span className={`level-avatar ${profile ?? growth?.loadout.profile ?? "profile-none"}`} style={{ width: size, height: size }}>
     <span className="avatar" style={{ width: size, height: size, fontSize: Math.round(size * 0.36) }} aria-hidden>{nickname.slice(0, 1)}</span>
     {growth && <svg className="level-ring" viewBox="0 0 48 48" aria-hidden>
       <circle cx="24" cy="24" r={RING_RADIUS} className="track"/>
@@ -27,7 +31,7 @@ export function CoinChip({ coins }: { coins: number }) {
 export function ProfileBadge({ nickname, growth }: { nickname: string; growth: GrowthView | null }) {
   return <span className="profile">
     <LevelAvatar nickname={nickname} growth={growth}/>
-    <span className="profile-text"><span className="profile-name">{nickname}</span>{growth && <span data-testid="player-level" className="profile-level">레벨 {growth.level}</span>}</span>
+    <span className="profile-text"><span className="profile-name">{nickname}</span>{growth && <span data-testid="player-level" className="profile-level">레벨 {growth.level} · {titleName(growth.loadout.title)}</span>}</span>
   </span>;
 }
 

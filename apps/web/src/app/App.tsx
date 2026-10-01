@@ -3,7 +3,8 @@ import { Flag, LogOut, WifiOff } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppHeader, BoardPair, PaperScreen, ProgressTrack, RESET_VIEWPORT, Segmented, StageScreen, ZoomControls, type AppTab } from "../features/gallery/components/Gallery";
 import { ArtworkShelf, FeaturedArtwork, featuredArtwork } from "../features/gallery/components/Exhibition";
-import { RewardPanel } from "../features/gallery/components/Growth";
+import { LevelAvatar, RewardPanel, titleName } from "../features/gallery/components/Growth";
+import { Wardrobe } from "../features/gallery/components/Wardrobe";
 import { ImageBoard } from "../features/game/components/ImageBoard";
 import { useGameClient } from "../features/game/hooks/use-game-client";
 import { clampViewport, type ImageViewport } from "../features/game/model/image-geometry";
@@ -43,7 +44,7 @@ const DIFFICULTY_DESCRIPTIONS: Record<GameDifficulty, string> = {
 
 export default function App() {
   const game = useGameClient();
-  const [soloActive, setSoloActive] = useState(false);
+  const [tab, setTab] = useState<AppTab>("HOME");
   const [originalNoticeCount, setOriginalNoticeCount] = useState(0);
   const [nicknameInput, setNicknameInput] = useState(game.nickname);
   const [mode, setMode] = useState<GameMode>("STANDARD");
@@ -107,7 +108,8 @@ export default function App() {
       .catch(() => setPreloadError("이미지를 불러오지 못했어요. 네트워크를 확인하고 다시 시도해주세요."));
   }, [game.snapshot?.state, game.snapshot?.currentPuzzleId, game.snapshot?.nextPuzzleId, game.match?.matchId, preloadAttempt, me?.loaded, game.connected]);
 
-  const switchTab = (tab: AppTab) => setSoloActive(tab === "SOLO");
+  const switchTab = (next: AppTab) => { game.clearError(); setTab(next); };
+  const loadout = game.growth?.loadout;
 
   if (game.phase === "NICKNAME") return <PaperScreen ambientSrc={featured.src}>
     <AppHeader/>
@@ -120,7 +122,9 @@ export default function App() {
     </section>
   </PaperScreen>;
 
-  if (soloActive) return <SoloGame nickname={game.nickname} growth={game.growth} soloResult={game.soloResult} onComplete={game.completeSolo} onTab={switchTab}/>;
+  if (tab === "STYLE" && game.phase === "LOBBY") return <Wardrobe nickname={game.nickname} growth={game.growth} error={game.error} onTab={switchTab} onBuy={game.buyItem} onEquip={game.equipItem}/>;
+
+  if (tab === "SOLO") return <SoloGame nickname={game.nickname} growth={game.growth} soloResult={game.soloResult} onComplete={game.completeSolo} onTab={switchTab}/>;
 
   if (game.phase === "LOBBY") return <PaperScreen ambientSrc={featured.src}>
     <div className="has-tabbar">
@@ -184,7 +188,7 @@ export default function App() {
         <span className={`play-timer ${remaining !== null && remaining <= 10 ? "danger" : remaining !== null && remaining <= 30 ? "warn" : ""}`}>{remaining === null ? "—" : formatClock(remaining)}</span>
         <div className="flex items-center gap-2">
           <span className="versus" aria-label={`찾은 차이 나 ${me?.totalFoundCount ?? 0}, 상대 ${opponent?.totalFoundCount ?? 0}`}>
-            <span className="avatar me">{game.nickname.slice(0, 1)}</span><span>{me?.totalFoundCount ?? 0}</span><span className="them">{opponent?.totalFoundCount ?? 0}</span><span className="avatar">{opponent?.nickname.slice(0, 1) ?? "?"}</span>
+            <LevelAvatar nickname={game.nickname} growth={null} size={28} profile={loadout?.profile}/><span>{me?.totalFoundCount ?? 0}</span><span className="them">{opponent?.totalFoundCount ?? 0}</span><LevelAvatar nickname={opponent?.nickname ?? "?"} growth={null} size={28} profile={game.match.opponentCosmetics?.profile}/>
           </span>
           {forfeitButton}
         </div>
@@ -195,9 +199,10 @@ export default function App() {
         </div>
       </div>
       <BoardPair
+        frame={loadout?.frame}
         modifiedTag={<>여기서 찾기 · <span data-testid="found-progress">{found} / {differenceCount}</span></>}
         original={<ImageBoard src={puzzle.originalSrc} alt={`${puzzle.alt} 원본`} viewport={imageViewport} onPanBy={panImages} onSelect={() => setOriginalNoticeCount((count) => count + 1)}/>}
-        modified={<ImageBoard src={puzzle.modifiedSrc} alt={`${puzzle.alt} 변경본`} marks={game.foundMarks} viewport={imageViewport} onPanBy={panImages} onSelect={inputLocked ? undefined : (point) => game.guess(puzzle.id, point)}/>}
+        modified={<ImageBoard src={puzzle.modifiedSrc} alt={`${puzzle.alt} 변경본`} marks={game.foundMarks} markStyle={loadout?.marker} viewport={imageViewport} onPanBy={panImages} onSelect={inputLocked ? undefined : (point) => game.guess(puzzle.id, point)}/>}
         overlay={toast}
       />
       {overlays}
@@ -223,9 +228,9 @@ export default function App() {
       <p className="eyebrow">상대를 찾았어요</p>
       <h1 className="sr-only">상대: {game.match.opponentNickname}</h1>
       <div className="versus-card">
-        <div><span className="avatar">{game.nickname.slice(0, 1)}</span><p className="font-bold">{game.nickname}</p></div>
+        <div className="grid justify-items-center gap-2"><LevelAvatar nickname={game.nickname} growth={null} size={64} profile={loadout?.profile}/><p className="font-bold">{game.nickname}</p><p className="muted text-[12px] font-semibold">{titleName(loadout?.title)}</p></div>
         <span className="vs">대</span>
-        <div><span className="avatar">{game.match.opponentNickname.slice(0, 1)}</span><p className="font-bold">{game.match.opponentNickname}</p></div>
+        <div className="grid justify-items-center gap-2"><LevelAvatar nickname={game.match.opponentNickname} growth={null} size={64} profile={game.match.opponentCosmetics?.profile}/><p className="font-bold">{game.match.opponentNickname}</p><p className="muted text-[12px] font-semibold">{titleName(game.match.opponentCosmetics?.title)}</p></div>
       </div>
       <p className="muted mt-6 text-[15px]">두 사람 모두 같은 그림을 동시에 풀어요.</p>
       <button data-testid="ready-button" type="button" disabled={me?.ready} onClick={game.ready} className="btn-primary mt-6 w-full">{me?.ready ? "준비 완료 · 상대를 기다리는 중" : "준비 완료"}</button>

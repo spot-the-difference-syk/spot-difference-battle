@@ -107,7 +107,7 @@ test("the first player to clear the deck wins immediately", async ({ browser }) 
     await expect(first.page.getByTestId("reward-panel")).toContainText("레벨이 올랐어요");
     await expect(first.page.getByTestId("reward-panel")).toContainText("+120");
     await expect(second.page.getByTestId("reward-panel")).toContainText("+40");
-    await expect(first.page.getByTestId("player-level")).toHaveText("레벨 2");
+    await expect(first.page.getByTestId("player-level")).toContainText("레벨 2");
   } finally {
     await first.context.close();
     await second.context.close();

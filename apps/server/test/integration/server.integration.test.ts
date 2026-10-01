@@ -162,6 +162,24 @@ describe("simultaneous game server", () => {
     await expect(loserReward).resolves.toMatchObject({ reward: { reason: "LOSS", xp: 40, coins: 30 }, progress: { level: 1, levelXp: 40 } });
   }, 15_000);
 
+  it("rejects unaffordable or locked cosmetics and shares the opponent's public cosmetics", async () => {
+    const first = await connect();
+    const second = await connect();
+    const poor = waitForEvent<GameErrorPayload>(first, "game:error", (error) => error.code === "NOT_ENOUGH_COINS");
+    first.emit("shop:buy", { itemId: "frame-wood" });
+    await poor;
+    const locked = waitForEvent<GameErrorPayload>(first, "game:error", (error) => error.code === "ITEM_LOCKED");
+    first.emit("shop:equip", { itemId: "title-eye" });
+    await locked;
+    const equipped = waitForEvent<PlayerGrowthPayload>(first, "player:growth", (payload) => payload.progress.loadout.marker === "marker-viewfinder");
+    first.emit("shop:equip", { itemId: "marker-viewfinder" });
+    await equipped;
+    const found = waitForEvent<MatchFoundPayload>(second, "match:found");
+    first.emit("queue:join", { nickname: "첫째" });
+    second.emit("queue:join", { nickname: "둘째" });
+    await expect(found).resolves.toMatchObject({ opponentCosmetics: { profile: "profile-none", title: "title-visitor" } });
+  });
+
   it("syncs growth on connect and rewards solo completions within the daily limit", async () => {
     const { port } = app.server.address() as AddressInfo;
     const socket: TestSocket = createClient(`http://127.0.0.1:${port}`, { forceNew: true, transports: ["websocket"], autoConnect: false });

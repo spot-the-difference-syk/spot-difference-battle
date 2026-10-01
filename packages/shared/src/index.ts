@@ -66,3 +66,20 @@ export {
   type RewardReason,
   type RewardSummary,
 } from "./game/progression.js";
+
+export {
+  COSMETIC_ITEMS,
+  COSMETIC_ITEM_BY_ID,
+  COSMETIC_SLOTS,
+  DEFAULT_LOADOUT,
+  buyCosmetic,
+  equipCosmetic,
+  normalizeLoadout,
+  ownsItem,
+  publicCosmetics,
+  type CosmeticItem,
+  type CosmeticLoadout,
+  type CosmeticResult,
+  type CosmeticSlot,
+  type PublicCosmetics,
+} from "./game/cosmetics.js";

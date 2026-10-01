@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { GameSnapshot, PlayerGrowthPayload } from "@spot-battle/shared";
+import type { GameSnapshot, MatchFoundPayload, PlayerGrowthPayload } from "@spot-battle/shared";
 import { GAME_PUZZLES } from "../../../apps/server/src/game/puzzle-catalog.js";
 import { RealtimeGame, type Archive, type Peer, type Storage } from "../src/game.js";
 import { allowedOrigin } from "../src/index.js";
@@ -192,6 +192,27 @@ describe("Cloudflare authoritative game", () => {
     expect(payloads.filter((p) => p.reward)).toHaveLength(5);
     expect(payloads.at(-2)!.soloLimitReached).toBe(true);
     expect(payloads.at(-1)!.progress).toMatchObject({ totalXp: 150, coins: 100 });
+  });
+  it("sells and equips cosmetics with server-side coin checks and shows them to the opponent", async () => {
+    const h = await harness();
+    const buyer = await h.add();
+    const growthFrames = (p: TestPeer) => p.frames.filter((f) => f.event === "player:growth").map((f) => f.payload as PlayerGrowthPayload);
+    await h.game.action(buyer, "shop:buy", { itemId: "frame-wood" });
+    expect(buyer.frames.at(-1)).toMatchObject({ event: "game:error", payload: { code: "NOT_ENOUGH_COINS" } });
+    const token = h.token(buyer);
+    const [key, session] = [...h.storage.data].find(([k]) => k.startsWith("session:"))!;
+    h.storage.data.set(key, { ...(session as object), growth: { totalXp: 0, coins: 1_000 } });
+    await h.disconnect(buyer);
+    await h.restore();
+    const rich = await h.add(token);
+    await h.game.action(rich, "shop:buy", { itemId: "profile-sage" });
+    expect(growthFrames(rich).at(-1)!.progress).toMatchObject({ coins: 700, loadout: { profile: "profile-sage" } });
+    await h.game.action(rich, "shop:equip", { itemId: "title-curator" });
+    expect(rich.frames.at(-1)).toMatchObject({ event: "game:error", payload: { code: "ITEM_LOCKED" } });
+    const opponent = await h.add();
+    await h.join(rich); await h.join(opponent);
+    const found = opponent.frames.find((f) => f.event === "match:found")!.payload as MatchFoundPayload;
+    expect(found.opponentCosmetics).toEqual({ profile: "profile-sage", title: "title-visitor" });
   });
   it("stamps snapshots with the server clock", async () => {
     const h = await harness(); const { first } = await h.start();

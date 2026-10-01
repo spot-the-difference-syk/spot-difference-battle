@@ -1,5 +1,5 @@
 import { GameMatch, GameRuleError, type MatchPuzzle, type PersistedMatchState } from "@spot-battle/game-core";
-import { DEFAULT_MATCH_SETTINGS, GAME_CONFIG, GAME_DIFFICULTIES, GAME_MODES, emptyGrowth, grantMatchReward, grantSoloReward, growthView, normalizeGrowth, type MatchSettings, type PlayerGrowth, type PlayerGrowthPayload } from "@spot-battle/shared";
+import { DEFAULT_MATCH_SETTINGS, GAME_CONFIG, GAME_DIFFICULTIES, GAME_MODES, buyCosmetic, emptyGrowth, equipCosmetic, grantMatchReward, grantSoloReward, growthView, normalizeGrowth, publicCosmetics, type MatchSettings, type PlayerGrowth, type PlayerGrowthPayload } from "@spot-battle/shared";
 import { GAME_PUZZLES } from "../../../apps/server/src/game/puzzle-catalog.js";
 
 export interface Storage {
@@ -142,7 +142,7 @@ export class RealtimeGame {
     if (live) {
       live.match.setConnectionStatus(active.playerId, "CONNECTED");
       const opponent = live.match.snapshot(active.playerId).players.find((p) => p.playerId !== active.playerId)!;
-      this.emit(peer, "match:found", { matchId: live.match.matchId, playerId: active.playerId, opponentNickname: opponent.nickname });
+      this.emit(peer, "match:found", { matchId: live.match.matchId, playerId: active.playerId, opponentNickname: opponent.nickname, opponentCosmetics: this.cosmeticsOf(opponent.playerId) });
       this.broadcast(live.match);
     }
     await this.checkpoint();
@@ -167,6 +167,14 @@ export class RealtimeGame {
         }
       } else if (event === "queue:join") {
         this.join(peer, session, object(payload));
+      } else if (event === "shop:buy" || event === "shop:equip") {
+        const itemId = string(object(payload), "itemId");
+        const growth = this.growthOf(session);
+        const level = growthView(growth).level;
+        const result = event === "shop:buy" ? buyCosmetic(growth, level, itemId) : equipCosmetic(growth, level, itemId);
+        if (!result.ok) throw new GameRuleError(result.code, result.message);
+        session.growth = result.growth;
+        this.emit(peer, "player:growth", this.growthPayload(session));
       } else if (event === "solo:complete") {
         const input = object(payload);
         if (typeof input.puzzleId !== "string" || typeof input.elapsedMs !== "number") throw new GameRuleError("INVALID_PAYLOAD", "솔로 기록 형식이 올바르지 않습니다.");
@@ -250,7 +258,9 @@ export class RealtimeGame {
     const match = new GameMatch(crypto.randomUUID(), puzzles, [{ playerId: waiting.playerId, nickname: waiting.nickname }, { playerId: session.playerId, nickname }], this.now(), settings);
     this.matches.set(match.matchId, { match, finishedAt: null, archived: false });
     this.waiting.delete(key);
-    for (const [target, name] of [[peer, waiting.nickname], [opponent, nickname]] as const) this.emit(target, "match:found", { matchId: match.matchId, playerId: target.playerId, opponentNickname: name });
+    for (const [target, name, opponentId] of [[peer, waiting.nickname, waiting.playerId], [opponent, nickname, session.playerId]] as const) {
+      this.emit(target, "match:found", { matchId: match.matchId, playerId: target.playerId, opponentNickname: name, opponentCosmetics: this.cosmeticsOf(opponentId) });
+    }
     this.broadcast(match);
   }
 
@@ -334,6 +344,11 @@ export class RealtimeGame {
 
   private growthOf(session: Session): PlayerGrowth {
     return session.growth ? normalizeGrowth(session.growth) : emptyGrowth();
+  }
+
+  private cosmeticsOf(playerId: string) {
+    const session = this.sessions.get(playerId);
+    return publicCosmetics((session ? this.growthOf(session) : emptyGrowth()).loadout);
   }
 
   private growthPayload(session: Session, extra: Omit<PlayerGrowthPayload, "progress"> = {}): PlayerGrowthPayload {

@@ -598,12 +598,18 @@ body {
 
 /* ---------- found marker: viewfinder ---------- */
 
-.viewfinder {
-  --t: 3px;
-  --l: 28%;
+.found-mark {
   position: absolute;
   aspect-ratio: 1;
   pointer-events: none;
+  animation: focus-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* 뷰파인더(기본) · 금빛 뷰파인더 */
+.marker-viewfinder,
+.marker-gold {
+  --t: 3px;
+  --l: 28%;
   background:
     linear-gradient(var(--mark), var(--mark)) top left / var(--l) var(--t),
     linear-gradient(var(--mark), var(--mark)) top left / var(--t) var(--l),
@@ -615,10 +621,14 @@ body {
     linear-gradient(var(--mark), var(--mark)) bottom right / var(--t) var(--l);
   background-repeat: no-repeat;
   filter: drop-shadow(0 0 1px rgb(0 0 0 / 0.75)) drop-shadow(0 0 6px rgb(0 0 0 / 0.35));
-  animation: focus-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-.viewfinder::after {
+.marker-gold {
+  --mark: #ecd296;
+}
+
+.marker-viewfinder::after,
+.marker-gold::after {
   content: '';
   position: absolute;
   left: 50%;
@@ -628,6 +638,91 @@ body {
   border-radius: 50%;
   background: var(--mark);
   transform: translate(-50%, -50%);
+}
+
+.marker-ring {
+  border: 2.5px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.35), inset 0 0 0 1px rgb(0 0 0 / 0.25), 0 0 12px rgb(0 0 0 / 0.3);
+}
+
+.marker-brush {
+  border: 3.5px solid #ffcf6e;
+  border-left-color: transparent;
+  border-radius: 48% 52% 46% 54%;
+  rotate: -14deg;
+  filter: drop-shadow(0 0 2px rgb(0 0 0 / 0.6));
+}
+
+.marker-glow {
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(255 255 255 / 0.55), rgb(255 255 255 / 0.15) 55%, transparent 70%);
+  box-shadow: 0 0 0 1.5px rgb(255 255 255 / 0.9), 0 0 24px 6px rgb(255 240 200 / 0.55);
+}
+
+/* ---------- frames around both boards ---------- */
+
+.board-slot.frame-wood,
+.board-slot.frame-mat,
+.board-slot.frame-gold,
+.board-slot.frame-black {
+  border-radius: 20px;
+}
+
+.board-slot.frame-wood {
+  padding: 7px;
+  background: linear-gradient(135deg, #a8733f, #6b4423 55%, #93613a);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.3), 0 20px 40px -18px rgb(0 0 0 / 0.7);
+}
+
+.board-slot.frame-mat {
+  padding: 12px;
+  background: #f7f5f0;
+  box-shadow: 0 20px 40px -18px rgb(0 0 0 / 0.7);
+}
+
+.board-slot.frame-gold {
+  padding: 7px;
+  background: linear-gradient(135deg, #f3dc94, #b38a35 45%, #f0d68c 70%, #9c7428);
+  box-shadow: inset 0 0 0 1px rgb(90 60 10 / 0.5), 0 20px 40px -18px rgb(0 0 0 / 0.7);
+}
+
+.board-slot.frame-black {
+  padding: 4px;
+  background: #0f0f10;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.12), 0 20px 40px -18px rgb(0 0 0 / 0.7);
+}
+
+.board-slot:not(.frame-none) > [data-testid] {
+  border-radius: 12px;
+}
+
+.board-slot:not(.frame-none) > .board-tag {
+  left: 16px;
+  top: 16px;
+}
+
+.board-slot.frame-mat > .board-tag {
+  left: 20px;
+  top: 20px;
+}
+
+/* ---------- profile borders ---------- */
+
+.level-avatar.profile-sage .avatar {
+  box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px #7d9a7e;
+}
+
+.level-avatar.profile-gold .avatar {
+  box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px #c9a24a, 0 0 10px rgb(201 162 74 / 0.6);
+}
+
+.level-avatar.profile-double .avatar {
+  box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px var(--ink), 0 0 0 5.5px var(--paper), 0 0 0 7px var(--ink);
+}
+
+.stage-screen .level-avatar .avatar {
+  --paper: #1d1d20;
 }
 
 /* ---------- toasts & overlays ---------- */
@@ -731,7 +826,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .viewfinder,
+  .found-mark,
   .fade-up,
   .tick,
   .play-timer.danger {
@@ -1079,5 +1174,176 @@ body {
 @media (min-width: 1024px) {
   .level-badge {
     display: none;
+  }
+}
+
+/* 프로필 테두리를 쓰면 레벨 링을 한 칸 바깥으로 */
+.level-avatar:not(.profile-none) .level-ring {
+  inset: -10px;
+  width: calc(100% + 20px);
+  height: calc(100% + 20px);
+}
+
+/* ---------- wardrobe ---------- */
+
+.wardrobe-preview {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  margin-top: 18px;
+  overflow: hidden;
+  padding: 18px;
+  border-radius: 24px;
+  background: #18181b;
+  color: #f4f2ee;
+}
+
+.wardrobe-preview .preview-board {
+  position: relative;
+  width: min(100%, 240px);
+}
+
+.wardrobe-preview .preview-board > img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.wardrobe-preview .preview-board.frame-none > img {
+  border-radius: 16px;
+}
+
+.preview-profile {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding-right: 6px;
+  text-align: center;
+}
+
+.preview-profile > strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.preview-profile > span:last-child {
+  color: rgb(255 255 255 / 0.6);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.item-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.item-card {
+  position: relative;
+  border-radius: 18px;
+  padding: 8px 8px 10px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  text-align: left;
+  transition: box-shadow 0.2s;
+}
+
+.item-card[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+.item-swatch {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #26262a;
+}
+
+.item-swatch.light {
+  background: var(--soft);
+}
+
+.item-swatch .found-mark {
+  left: 50%;
+  top: 50%;
+  width: 46%;
+  translate: -50% -50%;
+}
+
+.item-swatch.locked > * {
+  opacity: 0.4;
+}
+
+.item-name {
+  display: block;
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.item-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  color: var(--mute);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.item-status.equipped {
+  color: var(--ink);
+}
+
+.mini-frame {
+  width: 62%;
+  aspect-ratio: 1;
+}
+
+.mini-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.mini-frame.frame-wood { padding: 4px; border-radius: 9px; background: linear-gradient(135deg, #a8733f, #6b4423 55%, #93613a); }
+.mini-frame.frame-mat { padding: 6px; border-radius: 9px; background: #f7f5f0; }
+.mini-frame.frame-gold { padding: 4px; border-radius: 9px; background: linear-gradient(135deg, #f3dc94, #b38a35 45%, #f0d68c 70%, #9c7428); }
+.mini-frame.frame-black { padding: 2px; border-radius: 8px; background: #0f0f10; box-shadow: 0 0 0 1px rgb(255 255 255 / 0.15); }
+
+.title-chip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.wardrobe-action {
+  position: sticky;
+  bottom: 76px;
+  z-index: 5;
+  margin-top: 18px;
+  display: grid;
+  gap: 6px;
+  padding: 14px 0 6px;
+  background: linear-gradient(transparent, var(--paper) 30%);
+}
+
+@media (min-width: 1024px) {
+  .wardrobe-action {
+    bottom: 0;
   }
 }

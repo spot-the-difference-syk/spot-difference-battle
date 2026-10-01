@@ -1,3 +1,4 @@
+import { DEFAULT_LOADOUT, normalizeLoadout, normalizeOwnedItems, ownedItemIds, type CosmeticLoadout } from "./cosmetics.js";
 import type { GameSnapshot } from "./types.js";
 
 /** 서버가 저장하는 플레이어 성장 기록. 보상 계산은 항상 서버가 한다. */
@@ -9,6 +10,9 @@ export interface PlayerGrowth {
   /** 솔로 보상 하루 한도를 세는 한국 시간 날짜(YYYY-MM-DD). */
   soloRewardDay: string | null;
   soloRewardCount: number;
+  /** 코인으로 산 꾸미기 아이템 ID. 무료 아이템은 저장하지 않는다. */
+  ownedItems: string[];
+  loadout: CosmeticLoadout;
 }
 
 /** 화면에 보여줄 레벨 정보 */
@@ -20,6 +24,9 @@ export interface GrowthView {
   /** 다음 레벨까지 필요한 이번 레벨 경험치 총량 */
   levelXpGoal: number;
   coins: number;
+  /** 지금 쓸 수 있는 꾸미기 아이템(무료 해금 포함) */
+  ownedItemIds: string[];
+  loadout: CosmeticLoadout;
 }
 
 export type RewardReason = "WIN" | "LOSS" | "DRAW" | "SOLO";
@@ -47,7 +54,7 @@ export const PROGRESSION_RULES = {
   rewards: {
     WIN: { xp: 100, coins: 120 },
     LOSS: { xp: 40, coins: 30 },
-    DRAW: { xp: 70, coins: 75 },
+    DRAW: { xp: 60, coins: 60 },
     SOLO: { xp: 30, coins: 20 },
   },
   /** 하루에 솔로 보상을 받을 수 있는 횟수 */
@@ -68,7 +75,7 @@ export const PROGRESSION_RULES = {
 };
 
 export function emptyGrowth(): PlayerGrowth {
-  return { totalXp: 0, coins: 0, rewardedMatchIds: [], soloRewardDay: null, soloRewardCount: 0 };
+  return { totalXp: 0, coins: 0, rewardedMatchIds: [], soloRewardDay: null, soloRewardCount: 0, ownedItems: [], loadout: { ...DEFAULT_LOADOUT } };
 }
 
 /** level 레벨에서 다음 레벨로 가는 데 필요한 경험치 */
@@ -83,7 +90,15 @@ export function growthView(progress: PlayerGrowth): GrowthView {
     remaining -= xpForLevel(level);
     level += 1;
   }
-  return { level, totalXp: progress.totalXp, levelXp: remaining, levelXpGoal: xpForLevel(level), coins: progress.coins };
+  return {
+    level,
+    totalXp: progress.totalXp,
+    levelXp: remaining,
+    levelXpGoal: xpForLevel(level),
+    coins: progress.coins,
+    ownedItemIds: ownedItemIds(progress, level),
+    loadout: progress.loadout,
+  };
 }
 
 /** 저장소에서 읽은 값을 검증한다. 손상된 값은 빈 기록으로 취급한다. */
@@ -99,6 +114,8 @@ export function normalizeGrowth(value: unknown): PlayerGrowth {
       : [],
     soloRewardDay: typeof input.soloRewardDay === "string" ? input.soloRewardDay : null,
     soloRewardCount: count(input.soloRewardCount),
+    ownedItems: normalizeOwnedItems(input.ownedItems),
+    loadout: normalizeLoadout(input.loadout),
   };
 }
 
