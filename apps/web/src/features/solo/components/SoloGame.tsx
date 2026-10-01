@@ -137,6 +137,13 @@ export function SoloGame({ onExit }: { onExit: () => void }) {
     });
   };
 
+  const returnToSelection = () => {
+    // 정답 ID는 현재 그림에만 유효하므로 다른 그림을 고르기 전에 비운다.
+    setFoundIds([]);
+    setFeedback(null);
+    setPhase("SELECT");
+  };
+
   const panImages = (delta: NormalizedPoint) => {
     setViewport((current) => clampViewport({
       ...current,
@@ -180,6 +187,6 @@ export function SoloGame({ onExit }: { onExit: () => void }) {
       <div className="grid gap-5 lg:grid-cols-2"><div><p className="mb-2 text-center font-black">원본</p><ImageBoard src={puzzle.originalSrc} alt={`${puzzle.alt} 원본`} viewport={viewport} onPanBy={panImages}/></div><div><p className="mb-2 text-center font-black">변경본 · 여기를 선택</p><ImageBoard src={puzzle.modifiedSrc} alt={`${puzzle.alt} 변경본`} marks={marks} viewport={viewport} onPanBy={panImages} onSelect={selectPoint}/></div></div>
       {feedback && <p className={`mx-auto mt-4 w-fit rounded-xl px-5 py-3 font-black ${feedback.startsWith("정답") ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>{feedback}</p>}
     </section>}
-    {phase === "FINISHED" && finishedMs !== null && <section data-testid="solo-finished" className="mx-auto max-w-xl rounded-3xl bg-white p-9 text-center shadow-xl"><Trophy className="mx-auto text-amber-500" size={64}/><h2 className="mt-4 text-3xl font-black">5개 모두 찾았습니다!</h2><p className="mt-4 text-5xl font-black text-cyan-700">{formatSoloTime(finishedMs)}</p><p className="mt-3 text-slate-500">오답 {wrongAnswers}회 · 페널티 {wrongAnswers * SOLO_WRONG_PENALTY_MS / 1_000}초 포함</p><p className="mt-2 font-black">개인 최고기록 {formatSoloTime(records[puzzleId] ?? finishedMs)}</p><div className="mt-7 flex flex-wrap justify-center gap-3"><button type="button" onClick={() => void start()} className="inline-flex items-center gap-2 rounded-2xl bg-cyan-600 px-6 py-3 font-black text-white"><RotateCcw size={18}/>다시 도전</button><button type="button" onClick={() => setPhase("SELECT")} className="rounded-2xl bg-slate-100 px-6 py-3 font-black">다른 문제</button><button type="button" onClick={onExit} className="rounded-2xl bg-slate-900 px-6 py-3 font-black text-white">경쟁전 로비</button></div></section>}
+    {phase === "FINISHED" && finishedMs !== null && <section data-testid="solo-finished" className="mx-auto max-w-xl rounded-3xl bg-white p-9 text-center shadow-xl"><Trophy className="mx-auto text-amber-500" size={64}/><h2 className="mt-4 text-3xl font-black">5개 모두 찾았습니다!</h2><p className="mt-4 text-5xl font-black text-cyan-700">{formatSoloTime(finishedMs)}</p><p className="mt-3 text-slate-500">오답 {wrongAnswers}회 · 페널티 {wrongAnswers * SOLO_WRONG_PENALTY_MS / 1_000}초 포함</p><p className="mt-2 font-black">개인 최고기록 {formatSoloTime(records[puzzleId] ?? finishedMs)}</p><div className="mt-7 flex flex-wrap justify-center gap-3"><button type="button" onClick={() => void start()} className="inline-flex items-center gap-2 rounded-2xl bg-cyan-600 px-6 py-3 font-black text-white"><RotateCcw size={18}/>다시 도전</button><button type="button" onClick={returnToSelection} className="rounded-2xl bg-slate-100 px-6 py-3 font-black">다른 문제</button><button type="button" onClick={onExit} className="rounded-2xl bg-slate-900 px-6 py-3 font-black text-white">경쟁전 로비</button></div></section>}
   </main>;
 }
