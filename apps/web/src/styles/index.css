@@ -1,6 +1,7 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+@import './game.css';
 
 :root {
   min-width: 100%;
@@ -96,6 +97,6 @@ main.min-h-screen {
 }
 
 :where(button, input, select, [tabindex]):focus-visible {
-  outline: 3px solid #7c3aed;
+  outline: 3px solid #c4b5fd;
   outline-offset: 3px;
 }
