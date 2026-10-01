@@ -1458,3 +1458,66 @@ body {
 .collection-item.locked figcaption {
   color: #b4b0a9;
 }
+
+/* ---------- pointer & press feedback ---------- */
+
+/* 누를 수 있는 곳은 손가락 포인터(PC 웹). 폰·앱은 포인터가 없으므로 누름 반응으로 알려준다. */
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+a[href],
+summary,
+label[for],
+select,
+input[type='checkbox']:not(:disabled),
+input[type='radio']:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+/* 폰에서 누를 때 뜨는 파란 사각형 대신 아래 누름 반응을 쓴다. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-nav button,
+.segmented button,
+.genre-tabs button,
+.zoom-controls button,
+.icon-button,
+.item-card {
+  transition: transform 0.12s ease, background-color 0.15s, color 0.15s;
+}
+
+.app-nav button:active,
+.segmented button:active,
+.genre-tabs button:active,
+.zoom-controls button:not(:disabled):active,
+.icon-button:active,
+.item-card:active {
+  transform: scale(0.95);
+}
+
+.solo-card:active {
+  transform: scale(0.98);
+}
+
+/* 게임판: 찾은 표시와 같은 뷰파인더 포인터. 지원하지 않는 브라우저는 십자선. */
+.board-find {
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cpath d='M4 11V4h7M21 4h7v7M28 21v7h-7M11 28H4v-7' stroke='%23000' stroke-opacity='.55' stroke-width='5'/%3E%3Cpath d='M4 11V4h7M21 4h7v7M28 21v7h-7M11 28H4v-7' stroke='%23fff' stroke-width='2.5'/%3E%3C/g%3E%3Ccircle cx='16' cy='16' r='3' fill='%23fff' stroke='%23000' stroke-opacity='.55' stroke-width='1.5'/%3E%3C/svg%3E")
+      16 16,
+    crosshair;
+}
+
+/* 확대한 원본 그림은 끌어서 옮긴다. */
+.board-pan {
+  cursor: grab;
+}
+
+.board-pan:active {
+  cursor: grabbing;
+}
