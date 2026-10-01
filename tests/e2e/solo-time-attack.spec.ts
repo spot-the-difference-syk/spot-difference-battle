@@ -8,6 +8,8 @@ async function clickNormalized(page: Page, x: number, y: number) {
 }
 
 test("a solo player can finish five hard differences and keep a personal record", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/");
   await page.getByLabel("닉네임").fill("혼자찾기");
   await page.getByTestId("nickname-submit").click();
@@ -32,4 +34,13 @@ test("a solo player can finish five hard differences and keep a personal record"
   await expect(page.getByTestId("solo-finished")).toContainText("개인 최고기록");
   await page.getByRole("button", { name: "다른 문제" }).click();
   await expect(page.getByText(/최고 \d+\.\d{2}초/)).toHaveCount(1);
+  await page.getByRole("button", { name: "아침의 베이커리" }).click();
+  await expect(page.getByTestId("solo-puzzle-start")).toContainText("아침의 베이커리 시작");
+  await page.getByTestId("solo-puzzle-start").click();
+  await expect(page.getByTestId("solo-playing")).toBeVisible({ timeout: 6_000 });
+  await expect(page.getByText("발견 0/5", { exact: true })).toBeVisible();
+  await expect(page.getByText("오답 0", { exact: true })).toBeVisible();
+  await clickNormalized(page, 0.72, 0.31);
+  await expect(page.getByText("발견 1/5", { exact: true })).toBeVisible();
+  expect(pageErrors).toEqual([]);
 });
