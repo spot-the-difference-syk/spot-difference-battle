@@ -94,6 +94,16 @@ export class GameLobby {
           try { return await store.createReport(input); }
           finally { await store.close(); }
         },
+        saveGrowth: async (rows) => {
+          const store = new SupabasePostgresMatchStore(env.HYPERDRIVE!.connectionString, DATABASE_OPTIONS);
+          try { await store.saveGrowthBatch(rows); }
+          finally { await store.close(); }
+        },
+        findGrowth: async (hash) => {
+          const store = new SupabasePostgresMatchStore(env.HYPERDRIVE!.connectionString, DATABASE_OPTIONS);
+          try { return await store.findGrowthByTokenHash(hash); }
+          finally { await store.close(); }
+        },
       } : undefined;
       this.game = new RealtimeGame(ctx.storage, () => this.peers(), catalog, archive);
       await this.game.restore();
