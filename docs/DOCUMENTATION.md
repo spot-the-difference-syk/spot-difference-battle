@@ -35,6 +35,7 @@
 | `CLOUDFLARE_DEPLOYMENT.md` | 운영 배포·Supabase 연결·복구 |
 | `GAME_ASSETS.md` | 그림 품질 기준과 R2·카탈로그 등록 절차 |
 | `design/SOLO_ASSET_PROVENANCE.md` | 솔로 그림 생성 기록 |
+| `MOBILE_APPS.md` | Android·iOS 앱 구조, 서버 주소, 빌드·배포 |
 | `android-build-environment.md`, `android-wrapper-plan.md` | Android 래퍼 빌드 환경과 단계 계획 |
 | `REPOSITORY_STRUCTURE.md` | 디렉터리 책임과 의존 방향 |
 | `TEST_PLAN.md`, `TEST_STRUCTURE.md` | 검증 범위와 테스트 배치 |

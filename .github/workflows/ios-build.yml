@@ -1,0 +1,43 @@
+name: iOS App Build
+
+# 서명 없이 시뮬레이터용으로 빌드해 iOS 프로젝트가 깨지지 않았는지 확인한다.
+# App Store 배포용 서명 빌드는 Apple 개발자 계정으로 Xcode에서 한다(docs/MOBILE_APPS.md).
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "apps/ios/**"
+      - "scripts/build-cloudflare.mjs"
+      - "scripts/production.config.json"
+      - ".github/workflows/ios-build.yml"
+
+jobs:
+  ios-simulator:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --no-frozen-lockfile
+      - name: Build web bundle and sync iOS project
+        run: pnpm build:ios
+      - name: Verify the bundle points at the production game server
+        run: grep -q "$(node -p "require('./scripts/production.config.json').gameServerUrl")" apps/ios/ios/App/App/public/assets/*.js
+      - name: Build for iOS Simulator
+        run: >
+          xcodebuild -project apps/ios/ios/App/App.xcodeproj -scheme App
+          -configuration Debug -destination "generic/platform=iOS Simulator"
+          -derivedDataPath build/ios CODE_SIGNING_ALLOWED=NO build
+      - name: Upload simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: spot-difference-ios-simulator-app
+          path: build/ios/Build/Products/Debug-iphonesimulator/App.app
+          if-no-files-found: error

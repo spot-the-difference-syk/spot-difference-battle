@@ -5,7 +5,7 @@
 
 ## 활성 앱
 
-`src/main.tsx`가 `PuzzleCatalogProvider`로 감싼 `src/app/App.tsx`를 렌더한다. 화면은 `../../docs/SCREEN_SPEC.md`, 구현 기준은 `../../docs/design/UI_GUIDELINES.md`를 따른다. 같은 코드로 웹·앱인토스·Android(WebView)를 만든다.
+`src/main.tsx`가 `PuzzleCatalogProvider`로 감싼 `src/app/App.tsx`를 렌더한다. 화면은 `../../docs/SCREEN_SPEC.md`, 구현 기준은 `../../docs/design/UI_GUIDELINES.md`를 따른다. 같은 코드로 웹·앱인토스·Android·iOS를 만든다.
 
 ## 실행
 
@@ -22,7 +22,8 @@ pnpm dev
 | 명령(저장소 루트) | 연결 대상 | 용도 |
 |---|---|---|
 | `pnpm build:cloudflare` | 같은 Worker의 `/ws` | 운영 웹 |
-| `pnpm build:ait:cloudflare` | `VITE_SERVER_URL`의 Worker | 토스에 올리는 앱인토스 번들 |
+| `pnpm build:ait:cloudflare` | 운영 Worker | 토스에 올리는 앱인토스 번들 |
+| `pnpm build:android`, `pnpm build:ios` | 운영 Worker | Android·iOS 앱(`../../docs/MOBILE_APPS.md`) |
 | `pnpm build:ait` | 개발 서버(Socket.IO) | 로컬·CI 빌드 확인 |
 
 ## 검사

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { GameSnapshot, MatchFoundPayload, PlayerGrowthPayload } from "@spot-battle/shared";
 import { GAME_PUZZLES } from "../../../apps/server/src/game/puzzle-catalog.js";
 import { RealtimeGame, tokenHash, type Archive, type GrowthBackup, type Peer, type Storage } from "../src/game.js";
+import { readFileSync } from "node:fs";
 import { allowedOrigin } from "../src/index.js";
 
 class MemoryStorage implements Storage {
@@ -338,4 +339,19 @@ it("rejects cross-site and missing origins but accepts first party and AIT", () 
   expect(allowedOrigin(request(), env)).toBe(false);
   expect(allowedOrigin(request("https://game.example"), env)).toBe(true);
   expect(allowedOrigin(request(env.ALLOWED_ORIGINS), env)).toBe(true);
+});
+
+it("lets the Apps in Toss, Android and iOS apps connect with the deployed origin list", () => {
+  for (const file of ["wrangler.toml", "wrangler.local.toml"]) {
+    const toml = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+    const env = { ALLOWED_ORIGINS: /^ALLOWED_ORIGINS = "([^"]+)"/m.exec(toml)![1] };
+    const request = (origin: string) => new Request("https://game.example/ws", { headers: { Origin: origin } });
+    for (const origin of [
+      "https://spot-difference-syk.web.tossmini.com",
+      "https://spot-difference-syk.private-web.tossmini.com",
+      "https://appassets.androidplatform.net",
+      "capacitor://localhost",
+    ]) expect(allowedOrigin(request(origin), env), `${file}: ${origin}`).toBe(true);
+    expect(allowedOrigin(request("https://evil.example"), env)).toBe(false);
+  }
 });

@@ -9,7 +9,7 @@
 - [x] 동시 빨리찾기 대결(사전 로드·카운트다운·독립 진행·전체 완료 즉시 승리·점수제), 모드·난이도
 - [x] 솔로 타임어택
 - [x] Cloudflare Worker + Durable Object 운영, Supabase 경기·신고 저장
-- [x] 갤러리 UI(웹·앱인토스·Android 공용), 포인터 세트와 누름 반응
+- [x] 갤러리 UI(웹·앱인토스·Android·iOS 공용), 포인터 세트와 누름 반응
 - [x] 레벨·코인·꾸미기·수집·전적·오늘의 목표, 성장 기록 Supabase 백업
 - [x] R2 + 그림 목록(DB)으로 재배포 없이 그림 추가, 그림 등록 도구(`pnpm puzzle`)
 - [x] 구형 제작자/찾는 사람·편집기·제출·힌트 코드 제거
@@ -30,9 +30,12 @@
 - [ ] 접근성·색각·저사양 모바일·느린 네트워크 검증
 - [ ] 결과 화면 그림별 정답 보기, 재접속 남은 시간 표시
 
-## 빌드 경로
+## 모바일 앱
 
-- [ ] `pnpm build:ait`와 Android 웹 패키징(`package:android:web`)은 Node 서버(Socket.IO)에 연결하는 번들을 만든다. 운영 Worker에 연결하려면 Cloudflare 전송(`VITE_GAME_TRANSPORT=cloudflare`)과 Worker 주소로 빌드해야 한다. 토스 번들은 `pnpm build:ait:cloudflare`를 쓰고, Android 출시 전에 Android 경로를 정한다.
+- [x] Android·iOS 앱이 운영 Worker에 연결(`pnpm build:android`, `pnpm build:ios`), Worker에 앱 Origin 허용
+- [x] iOS 앱(Capacitor) 생성, 앱 아이콘·이름, Android 15 시스템 바 처리, CI 빌드
+- [ ] 실기기에서 매칭·그림 로딩·결과 흐름 확인(운영 Worker 주소 `scripts/production.config.json` 확인 포함)
+- [ ] Android release 서명·AAB·스토어 등록, iOS 서명·App Store 심사(`MOBILE_APPS.md`)
 
 ## 앱인토스 출시 전 — 계정과 상품화
 

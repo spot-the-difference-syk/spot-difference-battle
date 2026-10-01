@@ -80,9 +80,7 @@ apps/
 ```text
 apps/web/src
     ↓
-pnpm build:android:web
-    ↓
-apps/web/dist
+pnpm build:android (Cloudflare 전송 + 운영 서버 주소로 웹 빌드 후 복사)
     ↓
 Android preBuild
     ↓
@@ -105,19 +103,9 @@ spot-difference-syk.ait
 
 ## 서버 연결 원칙
 
-현재 웹 게임은 production에서 별도 `VITE_SERVER_URL`이 없으면 현재 origin을 서버로 사용한다.
+Android WebView는 앱 내부 HTTPS 가상 origin을 쓰므로, 웹을 빌드할 때 운영 Cloudflare Worker 주소를 넣는다. 주소는 `scripts/production.config.json` 한 곳에서 관리하고 `VITE_SERVER_URL`로 바꿀 수 있다(`MOBILE_APPS.md`).
 
-Android WebView는 앱 내부 HTTPS 가상 origin을 사용하므로 Android 빌드에서는 반드시 실제 Cloudflare Worker 주소를 `VITE_SERVER_URL`로 주입한다.
-
-예:
-
-```text
-VITE_SERVER_URL=https://<production-worker-host>
-```
-
-실제 운영 주소는 임의로 하드코딩하지 않는다. 배포 환경에서 확인한 뒤 고정한다.
-
-또한 Worker의 Origin 허용 정책에 Android WebView origin이 필요한지 실제 WebSocket 연결 테스트로 확인한다.
+Worker의 `ALLOWED_ORIGINS`에 아래 Android origin을 등록했다.
 
 Android WebView의 로컬 자산 origin은 다음을 사용한다.
 
@@ -176,14 +164,13 @@ Android 빌드는 Gradle Wrapper를 사용한다. 전역 Gradle 설치 버전을
 
 ```powershell
 pnpm install
-pnpm build:android:web
 cd apps/android
-.\gradlew.bat :app:assembleDebug
+.\gradlew.bat :app:assembleDebug   # preBuild가 pnpm build:android를 실행한다
 ```
 
 ## GitHub Actions 기준
 
-Android workflow는 기존 AIT workflow와 동일하게 수동 실행(`workflow_dispatch`)만 허용한다.
+Android workflow는 수동 실행과, `apps/android`·앱 빌드 스크립트를 바꾼 PR에서 실행한다. Gradle wrapper jar를 공식 체크섬으로 검증한 뒤 `./gradlew`로 빌드한다.
 
 CI 기준:
 
@@ -193,7 +180,7 @@ CI 기준:
 - Temurin JDK 17
 - Android SDK Platform 35
 - Build Tools 35.0.0
-- Gradle Wrapper 8.13
+- Gradle Wrapper 8.13 (`gradle/wrapper/gradle-wrapper.jar` 포함)
 
 산출물:
 
@@ -221,7 +208,7 @@ Java 17과 Android API 35는 서로 다른 버전 체계다.
 debug APK 및 실기기 검증 후 다음을 별도로 결정한다.
 
 - 최종 Android applicationId
-- 앱 표시 이름
+- 앱 표시 이름(현재 "틀린그림 갤러리")
 - versionCode/versionName 정책
 - release signing
 - AAB 생성

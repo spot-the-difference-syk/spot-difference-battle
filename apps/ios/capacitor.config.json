@@ -1,0 +1,10 @@
+{
+  "appId": "com.ninebarcode.spotdifference",
+  "appName": "틀린그림 갤러리",
+  "webDir": "../web/dist",
+  "backgroundColor": "#F8F7F4",
+  "ios": {
+    "contentInset": "never",
+    "scheme": "App"
+  }
+}
