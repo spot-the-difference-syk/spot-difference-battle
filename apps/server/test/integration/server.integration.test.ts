@@ -1,6 +1,6 @@
 import { GameMatch } from "@spot-battle/game-core";
 import { GAME_PUZZLES } from "../../src/game/puzzle-catalog.js";
-import type { ClientToServerEvents, GameErrorPayload, GameSnapshot, MatchFoundPayload, ServerToClientEvents } from "@spot-battle/shared";
+import type { ClientToServerEvents, GameErrorPayload, GameSnapshot, MatchFoundPayload, PlayerGrowthPayload, ServerToClientEvents } from "@spot-battle/shared";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { io as createClient, type Socket } from "socket.io-client";
@@ -149,6 +149,8 @@ describe("simultaneous game server", () => {
 
     const finishedFirst = waitForState(first, "FINISHED");
     const finishedSecond = waitForState(second, "FINISHED");
+    const winnerReward = waitForEvent<PlayerGrowthPayload>(first, "player:growth", (payload) => Boolean(payload.reward));
+    const loserReward = waitForEvent<PlayerGrowthPayload>(second, "player:growth", (payload) => Boolean(payload.reward));
     for (const point of [{ x: 0.31, y: 0.33 }, { x: 0.27, y: 0.78 }, { x: 0.79, y: 0.17 }]) {
       first.emit("game:guess", { matchId: firstMatch.matchId, puzzleId: "enchanted-forest", point, ...context });
     }
@@ -156,7 +158,44 @@ describe("simultaneous game server", () => {
     expect(firstResult).toMatchObject({ winnerId: firstMatch.playerId, endReason: "COMPLETED" });
     expect(secondResult).toMatchObject({ winnerId: firstMatch.playerId, endReason: "COMPLETED" });
     expect(typeof firstResult.serverNowMs).toBe("number");
+    await expect(winnerReward).resolves.toMatchObject({ matchId: firstMatch.matchId, reward: { reason: "WIN", xp: 100, coins: 120, leveledUp: true }, progress: { level: 2, coins: 120 } });
+    await expect(loserReward).resolves.toMatchObject({ reward: { reason: "LOSS", xp: 40, coins: 30 }, progress: { level: 1, levelXp: 40 } });
   }, 15_000);
+
+  it("rejects unaffordable or locked cosmetics and shares the opponent's public cosmetics", async () => {
+    const first = await connect();
+    const second = await connect();
+    const poor = waitForEvent<GameErrorPayload>(first, "game:error", (error) => error.code === "NOT_ENOUGH_COINS");
+    first.emit("shop:buy", { itemId: "frame-wood" });
+    await poor;
+    const locked = waitForEvent<GameErrorPayload>(first, "game:error", (error) => error.code === "ITEM_LOCKED");
+    first.emit("shop:equip", { itemId: "title-eye" });
+    await locked;
+    const equipped = waitForEvent<PlayerGrowthPayload>(first, "player:growth", (payload) => payload.progress.loadout.marker === "marker-viewfinder");
+    first.emit("shop:equip", { itemId: "marker-viewfinder" });
+    await equipped;
+    const found = waitForEvent<MatchFoundPayload>(second, "match:found");
+    first.emit("queue:join", { nickname: "첫째" });
+    second.emit("queue:join", { nickname: "둘째" });
+    await expect(found).resolves.toMatchObject({ opponentCosmetics: { profile: "profile-none", title: "title-visitor" } });
+  });
+
+  it("syncs growth on connect and rewards solo completions within the daily limit", async () => {
+    const { port } = app.server.address() as AddressInfo;
+    const socket: TestSocket = createClient(`http://127.0.0.1:${port}`, { forceNew: true, transports: ["websocket"], autoConnect: false });
+    sockets.push(socket);
+    const initial = waitForEvent<PlayerGrowthPayload>(socket, "player:growth");
+    socket.connect();
+    await expect(initial).resolves.toMatchObject({ progress: { level: 1, totalXp: 0, coins: 0 } });
+    const rewarded = waitForEvent<PlayerGrowthPayload>(socket, "player:growth", (payload) => Boolean(payload.reward));
+    socket.emit("solo:complete", { puzzleId: "observatory", elapsedMs: 41_000 });
+    await expect(rewarded).resolves.toMatchObject({ reward: { reason: "SOLO", xp: 30, coins: 20 }, progress: { totalXp: 30, coins: 20 } });
+    const rejected = waitForEvent<PlayerGrowthPayload>(socket, "player:growth");
+    socket.emit("solo:complete", { puzzleId: "observatory", elapsedMs: 10 });
+    const tooFast = await rejected;
+    expect(tooFast.reward).toBeUndefined();
+    expect(tooFast.progress.totalXp).toBe(30);
+  });
 
   it("keeps private progress scoped to each client and emits one authoritative result", async () => {
     const first = await connect();

@@ -19,6 +19,11 @@ async function clickNormalized(page: Page, x: number, y: number) {
   await page.waitForTimeout(160);
 }
 
+async function expectProgress(page: Page, puzzleNumber: number, totalPuzzles: number, found: number) {
+  await expect(page.getByTestId("puzzle-progress")).toHaveText(`${puzzleNumber} / ${totalPuzzles}`);
+  await expect(page.getByTestId("found-progress")).toHaveText(`${found} / 3`);
+}
+
 function pointsForPuzzle(puzzleId: string | null): Array<{ x: number; y: number }> {
   const puzzle = GAME_PUZZLES.find((candidate) => candidate.id === puzzleId as GamePuzzleId);
   if (!puzzle) throw new Error(`등록되지 않은 문제 ID입니다: ${puzzleId}`);
@@ -57,7 +62,7 @@ test("the first player to clear the deck wins immediately", async ({ browser }) 
 
     await first.page.getByTestId("original-board").click();
     await expect(first.page.getByRole("status")).toContainText("수정본에서 선택해주세요");
-    await expect(first.page.getByText(`나 1/${GAME_PUZZLE_IDS.length}번 · 0/3`, { exact: true })).toBeVisible();
+    await expectProgress(first.page, 1, GAME_PUZZLE_IDS.length, 0);
 
     const playingScreen = first.page.getByTestId("playing-screen");
     const firstPuzzleId = await playingScreen.getAttribute("data-puzzle-id");
@@ -79,12 +84,12 @@ test("the first player to clear the deck wins immediately", async ({ browser }) 
     await second.page.mouse.move(boardBox.x + boardBox.width / 2, boardBox.y + boardBox.height / 2 + 120, { steps: 5 });
     await second.page.mouse.up();
     const totalPuzzleCount = GAME_PUZZLE_IDS.length;
-    await expect(second.page.getByText(`나 1/${totalPuzzleCount}번 · 0/3`, { exact: true })).toBeVisible();
+    await expectProgress(second.page, 1, totalPuzzleCount, 0);
     await second.page.getByRole("button", { name: "원래 크기" }).click();
     await expect(second.page.getByTestId("zoom-controls")).toContainText("1.0배");
 
     await clickNormalized(second.page, firstPoints[0]!.x, firstPoints[0]!.y);
-    await expect(second.page.getByText(`나 1/${totalPuzzleCount}번 · 1/3`, { exact: true })).toBeVisible();
+    await expectProgress(second.page, 1, totalPuzzleCount, 1);
     for (let puzzleIndex = 0; puzzleIndex < totalPuzzleCount; puzzleIndex += 1) {
       const puzzleId = await playingScreen.getAttribute("data-puzzle-id");
       const points = pointsForPuzzle(puzzleId);
@@ -96,9 +101,16 @@ test("the first player to clear the deck wins immediately", async ({ browser }) 
       }
     }
 
-    await expect(first.page.getByTestId("finished-screen")).toContainText("승리했습니다", { timeout: 5_000 });
-    await expect(second.page.getByTestId("finished-screen")).toContainText("패배했습니다", { timeout: 5_000 });
+    await expect(first.page.getByTestId("finished-screen")).toContainText("승리했어요", { timeout: 5_000 });
+    await expect(second.page.getByTestId("finished-screen")).toContainText("패배했어요", { timeout: 5_000 });
     await expect(first.page.getByTestId("finished-screen")).toContainText("전체 문제 먼저 완료");
+    await expect(first.page.getByTestId("reward-panel")).toContainText("레벨이 올랐어요");
+    await expect(first.page.getByTestId("reward-panel")).toContainText("+120");
+    await expect(second.page.getByTestId("reward-panel")).toContainText("+40");
+    await expect(first.page.getByTestId("player-level")).toContainText("레벨 2");
+    await first.page.getByRole("button", { name: "로비로 돌아가기" }).click();
+    await first.page.getByTestId("me-open").click();
+    await expect(first.page.getByTestId("collection-count")).toHaveText(`${totalPuzzleCount} / ${totalPuzzleCount + 5}`);
   } finally {
     await first.context.close();
     await second.context.close();

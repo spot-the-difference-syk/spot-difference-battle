@@ -1,11 +1,13 @@
-import type { FoundMark, NormalizedPoint } from "@spot-battle/shared";
-import { ArrowLeft, Check, Clock3, Crown, Eye, LoaderCircle, Minus, MousePointerClick, Move, Plus, Play, RotateCcw, Timer, Trophy } from "lucide-react";
+import { PROGRESSION_RULES, type FoundMark, type GrowthView, type NormalizedPoint, type RewardSummary } from "@spot-battle/shared";
 import { useEffect, useMemo, useState } from "react";
 import {
   ImageBoard,
   type ImageSelectionContext,
 } from "../../game/components/ImageBoard";
 import { clampViewport, type ImageViewport } from "../../game/model/image-geometry";
+import { LogOut } from "lucide-react";
+import { RewardPanel } from "../../gallery/components/Growth";
+import { AppHeader, BoardPair, PaperScreen, ProgressTrack, StageScreen, ZoomControls, type AppTab } from "../../gallery/components/Gallery";
 import {
   SOLO_DIFFERENCE_COUNT,
   SOLO_WRONG_PENALTY_MS,
@@ -44,7 +46,13 @@ function saveRecords(records: SoloRecords) {
   }
 }
 
-export function SoloGame({ onExit }: { onExit: () => void }) {
+export function SoloGame({ nickname, growth, soloResult, onComplete, onTab }: {
+  nickname: string;
+  growth: GrowthView | null;
+  soloResult: { reward: RewardSummary | null; limitReached: boolean } | null;
+  onComplete: (puzzleId: SoloPuzzleId, elapsedMs: number) => void;
+  onTab: (tab: AppTab) => void;
+}) {
   const [phase, setPhase] = useState<SoloPhase>("SELECT");
   const [puzzleId, setPuzzleId] = useState<SoloPuzzleId>("observatory");
   const [records, setRecords] = useState<SoloRecords>(loadRecords);
@@ -117,7 +125,7 @@ export function SoloGame({ onExit }: { onExit: () => void }) {
     );
     if (!found) {
       setWrongAnswers((value) => value + 1);
-      setFeedback(`오답 · +${SOLO_WRONG_PENALTY_MS / 1_000}초`);
+      setFeedback(`틀렸어요 · +${SOLO_WRONG_PENALTY_MS / 1_000}초`);
       return;
     }
 
@@ -128,6 +136,7 @@ export function SoloGame({ onExit }: { onExit: () => void }) {
 
     const result = soloElapsedMs(startedAtMs, Date.now(), wrongAnswers);
     setFinishedMs(result);
+    onComplete(puzzleId, result);
     setNowMs(Date.now());
     setPhase("FINISHED");
     setRecords((current) => {
@@ -151,72 +160,76 @@ export function SoloGame({ onExit }: { onExit: () => void }) {
     }));
   };
 
+  const best = records[puzzleId];
+
   if (phase === "SELECT") {
-    return <main className="arena arena-solo min-h-screen">
-      <header className="glass mx-auto mb-6 flex max-w-6xl items-center justify-between gap-3 rounded-2xl px-4 py-3 sm:px-5">
-        <button type="button" onClick={onExit} className="btn btn-ghost rounded-xl px-4 py-2 text-sm"><ArrowLeft size={18}/>경쟁전 로비</button>
-        <div className="text-right"><h1 className="text-base font-black tracking-tight text-cyan-200">혼자 찾기 · 하드</h1><p className="text-xs text-white/50">5개를 가장 빠르게 찾으세요</p></div>
-      </header>
-      <section className="glass-strong pop-in mx-auto max-w-6xl p-5 sm:p-9">
-        <div className="text-center">
-          <div className="icon-tile icon-tile-cyan mx-auto size-16"><Timer size={32}/></div>
-          <p className="eyebrow mt-5">Solo Time Attack</p>
-          <h2 className="mt-1 bg-gradient-to-r from-white via-cyan-100 to-sky-200 bg-clip-text text-3xl font-black tracking-tight text-transparent sm:text-4xl">솔로 타임어택</h2>
-          <p className="mt-2 text-white/60">힌트 없이 정밀한 차이 5개를 찾습니다. 오답마다 3초가 기록에 추가됩니다.</p>
-        </div>
-        <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
-          {SOLO_PUZZLES.map((candidate) => {
-            const selected = puzzleId === candidate.id;
-            const record = records[candidate.id];
-            return <button key={candidate.id} type="button" aria-pressed={selected} onClick={() => setPuzzleId(candidate.id)} className={`group relative overflow-hidden rounded-2xl border text-left transition duration-200 ${selected ? "border-cyan-300/80 shadow-[0_0_0_1px_rgb(103_232_249/0.6),0_16px_40px_-12px_rgb(34_211_238/0.7)]" : "border-white/10 hover:border-white/30"}`}>
-              <span className="relative block aspect-square overflow-hidden">
-                <img src={candidate.originalSrc} alt="" className={`h-full w-full object-cover transition duration-300 group-hover:scale-105 ${selected ? "" : "opacity-80"}`}/>
-                <span className="absolute inset-0 bg-gradient-to-t from-[#08081a] via-[#08081a]/20 to-transparent"/>
-                {selected && <span className="absolute right-2 top-2 grid size-7 place-items-center rounded-full bg-cyan-400 text-slate-950"><Check size={16} strokeWidth={3}/></span>}
-              </span>
-              <span className="absolute inset-x-0 bottom-0 block p-3"><strong className="block text-sm sm:text-base">{candidate.label}</strong><small className={`text-xs ${record ? "font-bold text-amber-300" : "text-white/50"}`}>최고 {record ? formatSoloTime(record) : "기록 없음"}</small></span>
-            </button>;
-          })}
-        </div>
-        {loadError && <p className="mt-5 text-center font-bold text-rose-300">{loadError}</p>}
-        <div className="mt-8 text-center"><button data-testid="solo-puzzle-start" type="button" onClick={() => void start()} className="btn btn-cyan w-full px-8 py-4 text-lg sm:w-auto"><Play size={20} fill="currentColor"/>{puzzle.label} 시작</button></div>
-      </section>
-    </main>;
+    return <PaperScreen ambientSrc={puzzle.originalSrc}>
+      <div className="has-tabbar">
+        <AppHeader nickname={nickname} growth={growth} tab="SOLO" onTab={onTab}/>
+        <section className="fade-up mt-7">
+          <p className="eyebrow">혼자 하기</p>
+          <h1 className="display-title mt-1">솔로 타임어택</h1>
+          <p className="muted mt-2 text-[15px]">힌트 없이 작은 차이 5개를 찾아요. 틀릴 때마다 기록에 3초가 더해져요.</p>
+          <div className="solo-grid mt-6">
+            {SOLO_PUZZLES.map((candidate) => {
+              const record = records[candidate.id];
+              return <button key={candidate.id} type="button" aria-pressed={puzzleId === candidate.id} onClick={() => setPuzzleId(candidate.id)} className="solo-card">
+                <span className="solo-card-image"><img src={candidate.originalSrc} alt=""/></span>
+                <span className="solo-card-text"><strong>{candidate.label}</strong><small className={record ? "record" : ""}>{record ? `최고 ${formatSoloTime(record)}` : "최고 기록 없음"}</small></span>
+              </button>;
+            })}
+          </div>
+          {loadError && <p className="mt-5 text-center font-semibold text-[#c0392b]">{loadError}</p>}
+          <div className="mt-7 flex justify-center"><button data-testid="solo-puzzle-start" type="button" onClick={() => void start()} className="btn-primary w-full sm:w-auto sm:min-w-72">{puzzle.label} 시작</button></div>
+        </section>
+      </div>
+    </PaperScreen>;
   }
 
   if (phase === "LOADING" || phase === "COUNTDOWN") {
-    return <main className="arena arena-solo min-h-screen grid place-items-center">
-      <section data-testid="solo-countdown" className="text-center">
-        {phase === "LOADING"
-          ? <LoaderCircle className="mx-auto animate-spin text-cyan-300" size={72}/>
-          : <div key={countdown} className="count-beat bg-gradient-to-b from-white to-cyan-300 bg-clip-text text-[9rem] font-black leading-none text-transparent drop-shadow-[0_0_40px_rgb(34_211_238/0.55)]">{countdown}</div>}
-        <h2 className="mt-5 text-2xl font-black tracking-tight">{phase === "LOADING" ? "이미지 준비 중" : "집중하세요!"}</h2>
-        <p className="mt-1 text-sm text-white/50">{puzzle.label}</p>
+    return <StageScreen ambientSrc={puzzle.originalSrc}>
+      <section data-testid="solo-countdown" className="center-card">
+        {phase === "LOADING" ? <div className="spinner-ring"/> : <div key={countdown} className="big-number tick">{countdown}</div>}
+        <h1 className="mt-5 text-xl font-bold">{phase === "LOADING" ? "그림을 준비하고 있어요" : "집중하세요"}</h1>
+        <p className="mt-1 text-sm text-white/55">{puzzle.label}</p>
       </section>
-    </main>;
+    </StageScreen>;
   }
 
-  return <main className="arena arena-solo min-h-screen">
-    <header className="glass mx-auto mb-5 grid max-w-6xl grid-cols-[1fr_auto] items-center gap-x-4 gap-y-3 rounded-2xl px-4 py-3 sm:px-5">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2"><span className="truncate font-black text-cyan-200">{puzzle.label}</span><span className="chip border-cyan-300/30 bg-cyan-400/10 text-cyan-100">발견 {foundIds.length}/{SOLO_DIFFERENCE_COUNT}</span></div>
-        <div className="mt-2 flex gap-1">{Array.from({ length: SOLO_DIFFERENCE_COUNT }, (_, index) => <span key={index} className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${index < foundIds.length ? "bg-gradient-to-r from-cyan-300 to-sky-400" : "bg-white/10"}`}/>)}</div>
+  if (phase === "FINISHED" && finishedMs !== null) {
+    const isBest = best === finishedMs;
+    return <PaperScreen ambientSrc={puzzle.originalSrc}>
+      <AppHeader nickname={nickname} growth={growth}/>
+      <section data-testid="solo-finished" className="center-card fade-up">
+        <p className="eyebrow">{puzzle.label}</p>
+        <h1 className="display-title mt-1">5개 모두 찾았어요!</h1>
+        <p className="big-number mt-6" style={{ fontSize: "clamp(64px, 16vw, 104px)" }}>{formatSoloTime(finishedMs)}</p>
+        <p className="muted mt-3 text-[14px]">오답 {wrongAnswers}회 · 페널티 {wrongAnswers * SOLO_WRONG_PENALTY_MS / 1_000}초 포함</p>
+        <p className="mt-2 text-[14px] font-bold" style={{ color: isBest ? "var(--gold)" : undefined }}>{isBest ? "새 기록이에요 · " : ""}개인 최고기록 {formatSoloTime(best ?? finishedMs)}</p>
+        <RewardPanel reward={soloResult?.reward} note={soloResult?.limitReached ? `오늘 솔로 보상을 모두 받았어요 · 하루 ${PROGRESSION_RULES.soloDailyLimit}번` : undefined}/>
+        <div className="mt-8 grid gap-2">
+          <button type="button" onClick={() => void start()} className="btn-primary w-full">다시 도전</button>
+          <div className="grid grid-cols-2 gap-2"><button type="button" onClick={returnToSelection} className="btn-secondary">다른 문제</button><button type="button" onClick={() => onTab("HOME")} className="btn-secondary">홈으로</button></div>
+        </div>
+      </section>
+    </PaperScreen>;
+  }
+
+  return <StageScreen ambientSrc={puzzle.originalSrc} testId="solo-playing">
+    <div className="play-hud">
+      <span data-testid="solo-timer" className="play-timer">{formatSoloTime(runningMs)}</span>
+      <div className="flex items-center gap-2"><span className="pill">발견 {foundIds.length}/{SOLO_DIFFERENCE_COUNT}</span><span className={`pill ${wrongAnswers ? "bad" : ""}`}>오답 {wrongAnswers}</span><button type="button" aria-label="그만하기" className="icon-button" onClick={returnToSelection}><LogOut size={17}/></button></div>
+      <ProgressTrack done={foundIds.length} total={SOLO_DIFFERENCE_COUNT}/>
+      <div className="play-title">
+        <h2 className="truncate">{puzzle.label}</h2>
+        <ZoomControls viewport={viewport} onChange={setViewport}/>
       </div>
-      <div className="flex items-center gap-2"><span data-testid="solo-timer" className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-lg font-black tabular-nums"><Clock3 size={17} className="text-cyan-300"/>{formatSoloTime(finishedMs ?? runningMs)}</span><span className={`chip py-2 ${wrongAnswers ? "border-rose-400/40 bg-rose-500/15 text-rose-200" : ""}`}>오답 {wrongAnswers}</span></div>
-    </header>
-    {phase === "PLAYING" && <section data-testid="solo-playing" className="mx-auto max-w-6xl">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><p className="font-bold text-white/60">변경본에서 아주 작은 차이 5개를 찾으세요.</p><div className="flex items-center gap-2"><Move size={16} className="text-white/45"/><button type="button" aria-label="축소" disabled={viewport.scale <= 1} onClick={() => setViewport((current) => clampViewport({ ...current, scale: current.scale - 0.5 }))} className="icon-btn"><Minus size={18}/></button><strong className="min-w-12 text-center tabular-nums">{viewport.scale.toFixed(1)}배</strong><button type="button" aria-label="확대" disabled={viewport.scale >= 3} onClick={() => setViewport((current) => clampViewport({ ...current, scale: current.scale + 0.5 }))} className="icon-btn"><Plus size={18}/></button></div></div>
-      <div className="grid gap-5 lg:grid-cols-2"><div><p className="board-label text-white/60"><span className="inline-flex items-center gap-2"><Eye size={16}/>원본</span></p><ImageBoard src={puzzle.originalSrc} alt={`${puzzle.alt} 원본`} viewport={viewport} onPanBy={panImages}/></div><div><p className="board-label text-cyan-200"><span className="inline-flex items-center gap-2"><MousePointerClick size={16}/>변경본 · 여기를 선택</span></p><ImageBoard src={puzzle.modifiedSrc} alt={`${puzzle.alt} 변경본`} marks={marks} viewport={viewport} onPanBy={panImages} onSelect={selectPoint}/></div></div>
-      <div className="mt-4 flex min-h-12 justify-center">{feedback && <p key={`${foundIds.length}-${wrongAnswers}`} className={`toast pop-in ${feedback.startsWith("정답") ? "toast-good" : "toast-bad"}`}>{feedback}</p>}</div>
-    </section>}
-    {phase === "FINISHED" && finishedMs !== null && <section data-testid="solo-finished" className="glass-strong pop-in relative mx-auto max-w-xl overflow-hidden p-8 text-center sm:p-10">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(closest-side,rgb(251_191_36/0.3),transparent)]"/>
-      <div className="relative mx-auto grid size-20 place-items-center rounded-3xl bg-gradient-to-br from-amber-300 to-orange-500 text-amber-950 shadow-[0_14px_40px_-8px_rgb(251_191_36/0.9)]"><Trophy size={40}/></div>
-      <h2 className="relative mt-5 text-3xl font-black tracking-tight">5개 모두 찾았습니다!</h2>
-      <p className="mt-4 bg-gradient-to-r from-cyan-200 to-sky-300 bg-clip-text text-6xl font-black tabular-nums text-transparent">{formatSoloTime(finishedMs)}</p>
-      <p className="mt-3 text-white/55">오답 {wrongAnswers}회 · 페널티 {wrongAnswers * SOLO_WRONG_PENALTY_MS / 1_000}초 포함</p>
-      <p className="mx-auto mt-4 inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-400/10 px-4 py-2 font-black text-amber-200"><Crown size={16}/>개인 최고기록 {formatSoloTime(records[puzzleId] ?? finishedMs)}</p>
-      <div className="mt-8 flex flex-wrap justify-center gap-2.5"><button type="button" onClick={() => void start()} className="btn btn-cyan"><RotateCcw size={18}/>다시 도전</button><button type="button" onClick={returnToSelection} className="btn btn-ghost">다른 문제</button><button type="button" onClick={onExit} className="btn btn-ghost">경쟁전 로비</button></div>
-    </section>}
-  </main>;
+    </div>
+    <BoardPair
+      frame={growth?.loadout.frame}
+      original={<ImageBoard src={puzzle.originalSrc} alt={`${puzzle.alt} 원본`} viewport={viewport} onPanBy={panImages}/>}
+      modified={<ImageBoard src={puzzle.modifiedSrc} alt={`${puzzle.alt} 변경본`} marks={marks} markStyle={growth?.loadout.marker} viewport={viewport} onPanBy={panImages} onSelect={selectPoint}/>}
+      overlay={feedback && <span key={`${foundIds.length}-${wrongAnswers}`} className={`board-toast fade-up ${feedback.startsWith("정답") ? "" : "bad"}`}>{feedback}</span>}
+    />
+  </StageScreen>;
 }

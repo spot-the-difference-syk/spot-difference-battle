@@ -19,6 +19,8 @@ test("a solo player can finish five hard differences and keep a personal record"
   await expect(page.getByText("최고 기록 없음")).toHaveCount(5);
   await page.getByTestId("solo-puzzle-start").click();
   await expect(page.getByTestId("solo-playing")).toBeVisible({ timeout: 6_000 });
+  // 3초보다 빠른 완주는 서버가 비정상 기록으로 보고 보상하지 않는다.
+  await page.waitForTimeout(3_100);
 
   for (const point of [
     { x: 0.31, y: 0.21 },
@@ -30,8 +32,9 @@ test("a solo player can finish five hard differences and keep a personal record"
     await clickNormalized(page, point.x, point.y);
   }
 
-  await expect(page.getByTestId("solo-finished")).toContainText("5개 모두 찾았습니다!");
+  await expect(page.getByTestId("solo-finished")).toContainText("5개 모두 찾았어요!");
   await expect(page.getByTestId("solo-finished")).toContainText("개인 최고기록");
+  await expect(page.getByTestId("reward-panel")).toContainText("+30");
   await page.getByRole("button", { name: "다른 문제" }).click();
   await expect(page.getByText(/최고 \d+\.\d{2}초/)).toHaveCount(1);
   await page.getByRole("button", { name: "아침의 베이커리" }).click();
@@ -42,5 +45,10 @@ test("a solo player can finish five hard differences and keep a personal record"
   await expect(page.getByText("오답 0", { exact: true })).toBeVisible();
   await clickNormalized(page, 0.72, 0.31);
   await expect(page.getByText("발견 1/5", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "그만하기" }).click();
+  await page.getByTestId("style-open").click();
+  await expect(page.getByRole("heading", { name: "나만의 전시 스타일" })).toBeVisible();
+  await page.getByRole("button", { name: /얇은 원/ }).click();
+  await expect(page.getByText("코인이 480개 부족해요")).toBeVisible();
   expect(pageErrors).toEqual([]);
 });

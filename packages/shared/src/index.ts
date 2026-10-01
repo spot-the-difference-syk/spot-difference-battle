@@ -31,7 +31,9 @@ export {
 export {
   GAME_PUZZLE_ASSET_MANIFEST,
   GAME_PUZZLE_IDS,
+  SOLO_PUZZLE_IDS,
   type GamePuzzleId,
+  type SoloPuzzleId,
   type PuzzleAssetFileMetadata,
   type PuzzleAssetMetadata,
   type PuzzleDifficulty,
@@ -49,3 +51,43 @@ export {
   type ServerToClientEvents,
   type SessionReadyPayload,
 } from "./protocol/socket-events.js";
+
+export {
+  COLLECTIBLE_KEYS,
+  DAILY_GOALS,
+  PROGRESSION_RULES,
+  dailyGoalFor,
+  emptyGrowth,
+  grantSoloReward,
+  growthView,
+  koreanDay,
+  matchJourney,
+  matchRewardReason,
+  normalizeGrowth,
+  settleMatch,
+  xpForLevel,
+  type DailyGoalView,
+  type GrowthView,
+  type PlayerStats,
+  type PlayerGrowth,
+  type PlayerGrowthPayload,
+  type RewardReason,
+  type RewardSummary,
+} from "./game/progression.js";
+
+export {
+  COSMETIC_ITEMS,
+  COSMETIC_ITEM_BY_ID,
+  COSMETIC_SLOTS,
+  DEFAULT_LOADOUT,
+  buyCosmetic,
+  equipCosmetic,
+  normalizeLoadout,
+  ownsItem,
+  publicCosmetics,
+  type CosmeticItem,
+  type CosmeticLoadout,
+  type CosmeticResult,
+  type CosmeticSlot,
+  type PublicCosmetics,
+} from "./game/cosmetics.js";

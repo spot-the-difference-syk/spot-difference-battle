@@ -2,7 +2,9 @@
 import {
   DEFAULT_MATCH_SETTINGS,
   GAME_MODE_RULES,
+  normalizeGrowth,
   type GameSnapshot,
+  type PlayerGrowth,
   type ReportReason,
 } from "@spot-battle/shared";
 import { randomUUID } from "node:crypto";
@@ -25,6 +27,8 @@ export interface MatchStore {
   }>>;
   upsertGuest(input: { playerId: string; guestToken: string; nickname: string | null }): Promise<void>;
   deleteGuest(playerId: string): Promise<void>;
+  loadGrowth(): Promise<Array<{ playerId: string; growth: PlayerGrowth }>>;
+  saveGrowth(playerId: string, growth: PlayerGrowth): Promise<void>;
   loadActiveMatches(): Promise<PersistedMatchState[]>;
   saveActiveMatch(state: PersistedMatchState): Promise<void>;
   deleteActiveMatch(matchId: string): Promise<void>;
@@ -39,6 +43,7 @@ export class InMemoryMatchStore implements MatchStore {
   readonly reports = new Map<string, ReportInput>();
   readonly guests = new Map<string, { guestToken: string; nickname: string | null; updatedAt: number }>();
   readonly activeMatches = new Map<string, PersistedMatchState>();
+  readonly growth = new Map<string, PlayerGrowth>();
 
   async health(): Promise<boolean> {
     return true;
@@ -74,6 +79,15 @@ export class InMemoryMatchStore implements MatchStore {
 
   async deleteGuest(playerId: string): Promise<void> {
     this.guests.delete(playerId);
+    this.growth.delete(playerId);
+  }
+
+  async loadGrowth() {
+    return [...this.growth.entries()].map(([playerId, growth]) => ({ playerId, growth: structuredClone(growth) }));
+  }
+
+  async saveGrowth(playerId: string, growth: PlayerGrowth): Promise<void> {
+    this.growth.set(playerId, structuredClone(growth));
   }
 
   async saveMatch(snapshot: GameSnapshot, state: PersistedMatchState): Promise<void> {
@@ -168,6 +182,23 @@ export class SupabasePostgresMatchStore implements MatchStore {
 
   async deleteGuest(playerId: string): Promise<void> {
     await this.pool.query("DELETE FROM guest_sessions WHERE player_id = $1", [playerId]);
+  }
+
+  async loadGrowth() {
+    const result = await this.pool.query<{ player_id: string; growth: unknown }>(
+      "SELECT player_id, growth FROM player_growth",
+    );
+    return result.rows.map((row) => ({ playerId: row.player_id, growth: normalizeGrowth(row.growth) }));
+  }
+
+  async saveGrowth(playerId: string, growth: PlayerGrowth): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO player_growth (player_id, growth)
+       VALUES ($1, $2::jsonb)
+       ON CONFLICT (player_id) DO UPDATE
+       SET growth = EXCLUDED.growth, updated_at = NOW()`,
+      [playerId, JSON.stringify(growth)],
+    );
   }
 
   async saveMatch(snapshot: GameSnapshot, state: PersistedMatchState): Promise<void> {
