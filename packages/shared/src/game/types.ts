@@ -109,4 +109,6 @@ export interface GameSnapshot {
   revealedDifferences: RevealedDifference[] | null;
   endReason: GameEndReason | null;
   cancelReason: string | null;
+  /** 이 스냅샷을 보낸 순간의 서버 시각. 클라이언트 시계 오차 보정용. */
+  serverNowMs?: number;
 }

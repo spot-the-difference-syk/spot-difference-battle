@@ -9,6 +9,9 @@ export interface GameConnection {
   disconnect(): void;
 }
 
+/** Server errors that reject a queue request; it must not be replayed after reconnecting. */
+const QUEUE_REJECTION_CODES = new Set(["ALREADY_IN_MATCH", "INVALID_NICKNAME", "INVALID_SETTINGS", "SERVER_BUSY"]);
+
 export function websocketUrl(serverUrl: string): string {
   const url = new URL(serverUrl);
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
@@ -58,7 +61,8 @@ export class CloudflareConnection implements GameConnection {
         // Resume a queue only if the server has not restored a match.
         this.requeueTimer = setTimeout(() => { if (this.pendingQueue) this.send("queue:join", this.pendingQueue); }, 200);
       } else {
-        if (frame.event === "match:found" || frame.event === "queue:left") {
+        const code = frame.event === "game:error" ? (frame.payload as { code?: string } | undefined)?.code : undefined;
+        if (frame.event === "match:found" || frame.event === "queue:left" || (code && QUEUE_REJECTION_CODES.has(code))) {
           this.pendingQueue = undefined;
           clearTimeout(this.requeueTimer);
         }

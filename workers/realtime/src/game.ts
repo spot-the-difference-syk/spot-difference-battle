@@ -27,10 +27,16 @@ export interface Archive {
   save(state: PersistedMatchState): Promise<void>;
   report(input: { matchId: string; reporterPlayerId: string; reason: "UNFAIR" | "INAPPROPRIATE" | "SYSTEM_ERROR" | "OTHER"; details?: string }): Promise<string>;
 }
-const terminal = (match: GameMatch) => match.currentState === "FINISHED" || match.currentState === "CANCELLED";
+const terminal = (match: GameMatch) => match.isTerminal;
 const RETENTION = 5 * 60_000;
 const SESSION_RETENTION = 7 * 24 * 60 * 60_000;
+/** Sessions that never queued (no nickname) are cheap to recreate, so keep them briefly. */
+const ANONYMOUS_SESSION_RETENTION = 60 * 60_000;
+const MAX_SESSIONS = 5_000;
 const MAX_MATCHES = 100;
+/** Bound external database I/O per alarm. */
+const ARCHIVE_BATCH = 10;
+const GUESS_INTERVAL_MS = 120;
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new GameRuleError("INVALID_PAYLOAD", "요청 형식이 올바르지 않습니다.");
@@ -48,6 +54,7 @@ export class RealtimeGame {
   private waiting = new Map<string, Waiting>();
   private emissions: Array<() => void> = [];
   private persisted = new Map<string, string>();
+  private evicted: string[] = [];
 
   constructor(
     private storage: Storage,
@@ -68,12 +75,17 @@ export class RealtimeGame {
     for (const [key, waiting] of this.waiting) if (!liveIds.has(waiting.playerId)) this.waiting.delete(key);
     for (const live of this.matches.values()) {
       if (terminal(live.match)) continue;
-      for (const player of live.match.snapshot().players) {
-        const session = this.sessions.get(player.playerId);
-        if (!session) throw new Error("Missing persisted participant session.");
-        if (!liveIds.has(player.playerId)) {
+      for (const playerId of live.match.playerIds) {
+        const session = this.sessions.get(playerId);
+        if (!session) {
+          // A missing session must not brick the whole lobby; the match cannot resume for that player.
+          console.error(JSON.stringify({ event: "game.missing_participant_session", matchId: live.match.matchId }));
+          live.match.forfeit(playerId);
+          continue;
+        }
+        if (!liveIds.has(playerId)) {
           session.reconnectAt ??= this.now() + GAME_CONFIG.reconnectGraceSeconds * 1_000;
-          live.match.setConnectionStatus(player.playerId, "RECONNECTING");
+          live.match.setConnectionStatus(playerId, "RECONNECTING");
         }
       }
     }
@@ -84,11 +96,20 @@ export class RealtimeGame {
     this.emissions.push(() => peer.send(event, payload));
   }
   private current(playerId: string): LiveMatch | undefined {
-    return [...this.matches.values()].find(({ match, retiredPlayers }) => !retiredPlayers?.includes(playerId) && match.snapshot().players.some((p) => p.playerId === playerId));
+    for (const live of this.matches.values()) {
+      if (!live.retiredPlayers?.includes(playerId) && live.match.playerIds.includes(playerId)) return live;
+    }
+    return undefined;
+  }
+  private snapshotFor(match: GameMatch, playerId: string) {
+    return { ...match.snapshot(playerId), serverNowMs: this.now() };
   }
   private broadcast(match: GameMatch): void {
+    const live = this.matches.get(match.matchId);
+    const recipients = match.playerIds.filter((id) => !live?.retiredPlayers?.includes(id));
+    if (!recipients.length) return;
     for (const peer of this.peers()) {
-      if (peer.playerId && this.current(peer.playerId)?.match === match) this.emit(peer, "game:snapshot", match.snapshot(peer.playerId));
+      if (peer.playerId && recipients.includes(peer.playerId)) this.emit(peer, "game:snapshot", this.snapshotFor(match, peer.playerId));
     }
   }
   private removeWaiting(playerId: string): void {
@@ -96,7 +117,13 @@ export class RealtimeGame {
   }
 
   async authenticate(peer: Peer, token: unknown): Promise<void> {
-    const session = typeof token === "string" ? [...this.sessions.values()].find((s) => s.guestToken === token) : undefined;
+    const session = typeof token === "string" && token ? [...this.sessions.values()].find((s) => s.guestToken === token) : undefined;
+    if (!session && this.sessions.size >= MAX_SESSIONS && !this.evictIdleSession()) {
+      this.emit(peer, "game:error", { code: "SERVER_BUSY", message: "접속자가 많습니다. 잠시 후 다시 시도해주세요." });
+      // The unauthenticated socket is closed by the auth deadline and the client retries later.
+      await this.checkpoint();
+      return;
+    }
     const active = session ?? { playerId: crypto.randomUUID(), guestToken: crypto.randomUUID(), nickname: null, lastSeenAt: this.now(), reconnectAt: null };
     this.sessions.set(active.playerId, active);
     for (const old of this.peers()) if (old.id !== peer.id && old.playerId === active.playerId) old.close();
@@ -105,10 +132,11 @@ export class RealtimeGame {
     this.emit(peer, "session:ready", { playerId: active.playerId, guestToken: active.guestToken });
     await this.advance();
     active.reconnectAt = null;
+    // A finished match the player has not dismissed is shown again (e.g. forfeited while offline).
     const live = this.current(active.playerId);
     if (live) {
       live.match.setConnectionStatus(active.playerId, "CONNECTED");
-      const opponent = live.match.snapshot().players.find((p) => p.playerId !== active.playerId)!;
+      const opponent = live.match.snapshot(active.playerId).players.find((p) => p.playerId !== active.playerId)!;
       this.emit(peer, "match:found", { matchId: live.match.matchId, playerId: active.playerId, opponentNickname: opponent.nickname });
       this.broadcast(live.match);
     }
@@ -125,6 +153,13 @@ export class RealtimeGame {
       if (event === "queue:leave") {
         this.removeWaiting(peer.playerId);
         this.emit(peer, "queue:left");
+      } else if (event === "game:dismiss") {
+        const input = object(payload);
+        const live = this.current(peer.playerId);
+        // Only finished matches can be dismissed; an active match must be forfeited instead.
+        if (live && live.match.matchId === string(input, "matchId") && terminal(live.match)) {
+          live.retiredPlayers = [...(live.retiredPlayers ?? []), peer.playerId];
+        }
       } else if (event === "queue:join") {
         this.join(peer, session, object(payload));
       } else {
@@ -139,7 +174,7 @@ export class RealtimeGame {
           const point = object(input.point);
           if (![point.x, point.y].every((n) => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 1)) throw new GameRuleError("INVALID_POINT", "선택 좌표가 올바르지 않습니다.");
           const previous = session.lastGuessAt;
-          if (previous !== undefined && this.now() - previous < 120) throw new GameRuleError("INPUT_RATE_LIMITED", "입력이 너무 빠릅니다. 잠시 후 다시 시도해주세요.");
+          if (previous !== undefined && this.now() - previous < GUESS_INTERVAL_MS) throw new GameRuleError("INPUT_RATE_LIMITED", "입력이 너무 빠릅니다. 잠시 후 다시 시도해주세요.");
           session.lastGuessAt = this.now();
           const result = match.guess(peer.playerId, string(input, "puzzleId") as MatchPuzzle["id"], { x: point.x as number, y: point.y as number }, this.now());
           this.emit(peer, "game:guess-result", result);
@@ -181,7 +216,7 @@ export class RealtimeGame {
     if (!GAME_MODES.includes(raw.mode as never) || !GAME_DIFFICULTIES.includes(raw.difficulty as never)) throw new GameRuleError("INVALID_SETTINGS", "지원하지 않는 게임 설정입니다.");
     const settings = { mode: raw.mode, difficulty: raw.difficulty } as MatchSettings;
     // Finished matches remain available for reports until the player queues again.
-    if (old) old.retiredPlayers = [...(old.retiredPlayers ?? []), session.playerId];
+    if (old) old.retiredPlayers = [...new Set([...(old.retiredPlayers ?? []), session.playerId])];
     session.nickname = nickname;
     this.removeWaiting(session.playerId);
     const key = `${settings.mode}:${settings.difficulty}`;
@@ -230,17 +265,22 @@ export class RealtimeGame {
     for (const live of this.matches.values()) {
       const { match } = live;
       // Use the intended countdown deadline, even if an alarm arrives late.
-      const deadline = match.snapshot().deadlineMs;
+      if (terminal(match)) {
+        live.finishedAt ??= this.now();
+        continue;
+      }
+      const deadline = match.deadline;
+      const before = match.version;
       if (match.currentState === "COUNTDOWN" && deadline !== null && this.now() >= deadline) match.expire(deadline);
-      const changed = match.expire(this.now());
-      for (const player of match.snapshot().players) {
-        const session = this.sessions.get(player.playerId);
+      match.expire(this.now());
+      for (const playerId of match.playerIds) {
+        const session = this.sessions.get(playerId);
         if (session?.reconnectAt && this.now() >= session.reconnectAt) {
           session.reconnectAt = null;
-          match.forfeit(player.playerId);
+          match.forfeit(playerId);
         }
       }
-      if ((live.retiredPlayers?.length ?? 0) < 2 && (changed || terminal(match) || (deadline !== match.snapshot().deadlineMs))) this.broadcast(match);
+      if (match.version !== before) this.broadcast(match);
       if (terminal(match)) live.finishedAt ??= this.now();
     }
   }
@@ -252,8 +292,12 @@ export class RealtimeGame {
   }
 
   async flushArchive(): Promise<void> {
+    let attempts = 0;
     for (const live of this.matches.values()) {
       if (!terminal(live.match) || live.archived) continue;
+      // Bound external I/O per alarm; remaining durable records are retried next time.
+      if (this.archive && attempts >= ARCHIVE_BATCH) break;
+      attempts += 1;
       try {
         if (this.archive) await this.archive.save(live.match.serialize());
         live.archived = true;
@@ -261,11 +305,29 @@ export class RealtimeGame {
       } catch {
         // Keep the durable record and retry on the next alarm. Never log credentials.
         console.error(JSON.stringify({ event: "database.finished_match_save_failed", matchId: live.match.matchId }));
+        // The database is likely down; stop and retry later instead of hammering it.
+        break;
       }
-      // Bound external I/O per alarm; remaining durable records are retried next time.
-      if (this.archive) break;
     }
     await this.checkpoint();
+  }
+
+  private sessionRetention(session: Session): number {
+    return session.nickname === null ? ANONYMOUS_SESSION_RETENTION : SESSION_RETENTION;
+  }
+
+  /** Frees the least recently seen offline session that is not in a match. */
+  private evictIdleSession(): boolean {
+    const activeIds = new Set(this.peers().map((p) => p.playerId));
+    let oldest: Session | undefined;
+    for (const session of this.sessions.values()) {
+      if (activeIds.has(session.playerId) || this.current(session.playerId)) continue;
+      if (!oldest || session.lastSeenAt < oldest.lastSeenAt) oldest = session;
+    }
+    if (!oldest) return false;
+    this.sessions.delete(oldest.playerId);
+    this.evicted.push(oldest.playerId);
+    return true;
   }
 
   private async putChanged(storage: Storage, key: string, value: unknown): Promise<void> {
@@ -302,22 +364,26 @@ export class RealtimeGame {
     // Removed finished matches are retained durably, including when users start another match.
     for (const [id, live] of this.matches) await this.putChanged(storage, `match:${id}`, { state: live.match.serialize(), finishedAt: live.finishedAt, archived: live.archived, retiredPlayers: live.retiredPlayers });
     await this.putChanged(storage, "waiting", [...this.waiting]);
+    for (const id of this.evicted.splice(0)) {
+      await storage.delete(`session:${id}`);
+      this.persisted.delete(`session:${id}`);
+    }
     const activeIds = new Set(this.peers().map((p) => p.playerId));
     for (const [id, session] of this.sessions) {
-      if (!activeIds.has(id) && !this.current(id) && now >= session.lastSeenAt + SESSION_RETENTION) {
+      if (!activeIds.has(id) && !this.current(id) && now >= session.lastSeenAt + this.sessionRetention(session)) {
         this.sessions.delete(id);
         await storage.delete(`session:${id}`);
       } else await this.putChanged(storage, `session:${id}`, session);
     }
     const deadlines: number[] = [];
     for (const live of this.matches.values()) {
-      const deadline = live.match.snapshot().deadlineMs;
+      const deadline = live.match.deadline;
       if (!terminal(live.match) && deadline !== null) deadlines.push(deadline);
       if (live.finishedAt !== null) deadlines.push(live.archived ? live.finishedAt + RETENTION : now + 30_000);
     }
     for (const session of this.sessions.values()) {
       if (session.reconnectAt) deadlines.push(session.reconnectAt);
-      if (!activeIds.has(session.playerId) && !this.current(session.playerId)) deadlines.push(session.lastSeenAt + SESSION_RETENTION);
+      if (!activeIds.has(session.playerId) && !this.current(session.playerId)) deadlines.push(session.lastSeenAt + this.sessionRetention(session));
     }
     if (deadlines.length) await storage.setAlarm(Math.max(now + 1, Math.min(...deadlines)));
     else await storage.deleteAlarm();

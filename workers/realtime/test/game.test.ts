@@ -149,6 +149,40 @@ describe("Cloudflare authoritative game", () => {
     h.advance(15_000); await h.game.alarm();
     expect(h.snapshot(a).deadlineMs).toBe(countdownDeadline + 180_000);
   });
+  it("does not resume a finished match after the player dismissed it", async () => {
+    const h = await harness(); const { first } = await h.start();
+    await h.action(first, "game:forfeit");
+    const matchId = h.snapshot(first).matchId;
+    await h.game.action(first, "game:dismiss", { matchId });
+    const token = h.token(first);
+    await h.disconnect(first);
+    const resumed = await h.add(token);
+    expect(resumed.frames.map((f) => f.event)).toEqual(["session:ready"]);
+  });
+  it("ignores dismissal of an active match", async () => {
+    const h = await harness(); const { first } = await h.start();
+    const matchId = h.snapshot(first).matchId;
+    await h.game.action(first, "game:dismiss", { matchId });
+    const token = h.token(first);
+    await h.disconnect(first);
+    const resumed = await h.add(token);
+    expect(resumed.frames.some((f) => f.event === "match:found")).toBe(true);
+    expect(h.snapshot(resumed).state).toBe("PLAYING");
+  });
+  it("stamps snapshots with the server clock", async () => {
+    const h = await harness(); const { first } = await h.start();
+    expect(typeof h.snapshot(first).serverNowMs).toBe("number");
+  });
+  it("expires anonymous sessions after an hour but keeps named ones", async () => {
+    const h = await harness();
+    const anonymous = await h.add(); const named = await h.add();
+    await h.join(named);
+    await h.game.action(named, "queue:leave");
+    await h.disconnect(anonymous); await h.disconnect(named);
+    h.advance(60 * 60_000 + 1); await h.game.alarm();
+    expect(h.storage.data.has(`session:${anonymous.playerId}`)).toBe(false);
+    expect(h.storage.data.has(`session:${named.playerId}`)).toBe(true);
+  });
 });
 
 it("rejects cross-site and missing origins but accepts first party and AIT", () => {

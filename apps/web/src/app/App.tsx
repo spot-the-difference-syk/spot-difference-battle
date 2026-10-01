@@ -7,14 +7,14 @@ import { clampViewport, type ImageViewport } from "../features/game/model/image-
 import { GAME_PUZZLE_VISUALS, preloadPuzzle } from "../features/game/puzzles/catalog";
 import { SoloGame } from "../features/solo/components/SoloGame";
 
-function useRemainingSeconds(deadlineMs: number | null | undefined): number | null {
+function useRemainingSeconds(deadlineMs: number | null | undefined, serverNow: () => number): number | null {
   const [, refresh] = useState(0);
   useEffect(() => {
     if (!deadlineMs) return;
     const timer = window.setInterval(() => refresh((value) => value + 1), 100);
     return () => window.clearInterval(timer);
   }, [deadlineMs]);
-  return deadlineMs ? Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1_000)) : null;
+  return deadlineMs ? Math.max(0, Math.ceil((deadlineMs - serverNow()) / 1_000)) : null;
 }
 
 function formatScore(value: number | undefined): string {
@@ -37,12 +37,18 @@ export default function App() {
   const [preloadAttempt, setPreloadAttempt] = useState(0);
   const [imageViewport, setImageViewport] = useState<ImageViewport>({ scale: 1, pan: { x: 0, y: 0 } });
   const loadedKeyRef = useRef<string | null>(null);
-  const remaining = useRemainingSeconds(game.snapshot?.deadlineMs);
+  const remaining = useRemainingSeconds(game.snapshot?.deadlineMs, game.serverNow);
   const me = game.snapshot?.players.find((player) => player.playerId === game.match?.playerId);
   const opponent = game.snapshot?.players.find((player) => player.playerId !== game.match?.playerId);
   const puzzleId = game.snapshot?.currentPuzzleId ?? null;
   const puzzle = puzzleId ? GAME_PUZZLE_VISUALS[puzzleId] : null;
-  const inputLocked = Boolean(me?.inputLockedUntilMs && me.inputLockedUntilMs > Date.now());
+  const inputLocked = Boolean(me?.inputLockedUntilMs && me.inputLockedUntilMs > game.serverNow());
+  const lockSeconds = GAME_DIFFICULTY_RULES[game.snapshot?.settings?.difficulty ?? "NORMAL"].wrongAnswerLockSeconds;
+  const reconnectCount = useRef(0);
+  useEffect(() => {
+    if (!game.connected) reconnectCount.current += 1;
+  }, [game.connected]);
+
   useEffect(() => {
     setImageViewport({ scale: 1, pan: { x: 0, y: 0 } });
     setOriginalNoticeCount(0);
@@ -74,7 +80,9 @@ export default function App() {
       return;
     }
 
-    const key = `${game.match.matchId}:${game.snapshot.currentPuzzleId}`;
+    // Re-send after a reconnect: a message sent while offline is lost, and the server keeps waiting.
+    if (me?.loaded || !game.connected) return;
+    const key = `${game.match.matchId}:${game.snapshot.currentPuzzleId}:${preloadAttempt}:${reconnectCount.current}`;
     if (loadedKeyRef.current === key) return;
     void loading
       .then(() => {
@@ -83,7 +91,7 @@ export default function App() {
         game.loaded(game.snapshot!.currentPuzzleId!);
       })
       .catch(() => setPreloadError("이미지를 불러오지 못했습니다. 네트워크를 확인하고 다시 시도해주세요."));
-  }, [game.snapshot?.state, game.snapshot?.currentPuzzleId, game.snapshot?.nextPuzzleId, game.match?.matchId, preloadAttempt]);
+  }, [game.snapshot?.state, game.snapshot?.currentPuzzleId, game.snapshot?.nextPuzzleId, game.match?.matchId, preloadAttempt, me?.loaded, game.connected]);
 
   const header = useMemo(() => (
     <header className="mx-auto mb-6 flex max-w-6xl items-center justify-between rounded-2xl bg-white/90 px-5 py-4 shadow-sm">
@@ -115,11 +123,11 @@ export default function App() {
 
     {game.snapshot.state === "COUNTDOWN" && <section data-testid="countdown-screen" className="mx-auto max-w-xl rounded-3xl bg-white p-12 text-center shadow-xl"><div className="text-8xl font-black text-violet-600">{remaining ?? 0}</div><h2 className="mt-3 text-2xl font-black">곧 시작합니다!</h2></section>}
 
-    {game.snapshot.state === "PLAYING" && puzzle && <section data-testid="playing-screen" data-puzzle-id={puzzle.id} className="mx-auto max-w-6xl"><div className="mb-4 text-center"><h2 className="text-2xl font-black">{puzzle.label}</h2><p className="text-sm text-slate-500">수정본에서 차이 {me?.currentDifferenceCount ?? 0}개를 찾으세요. 다 찾으면 바로 다음 그림으로 이동합니다.</p></div><div className="mb-4 flex flex-wrap items-center justify-center gap-2" data-testid="zoom-controls"><span className="mr-1 inline-flex items-center gap-1 text-sm font-bold text-slate-600"><Move size={16}/>확대 후 드래그</span><button type="button" aria-label="축소" disabled={imageViewport.scale <= 1} onClick={() => changeZoom(-0.5)} className="rounded-xl bg-white p-2 shadow disabled:opacity-35"><Minus size={18}/></button><span className="min-w-14 text-center font-black">{imageViewport.scale.toFixed(1)}배</span><button type="button" aria-label="확대" disabled={imageViewport.scale >= 3} onClick={() => changeZoom(0.5)} className="rounded-xl bg-white p-2 shadow disabled:opacity-35"><Plus size={18}/></button><button type="button" onClick={() => setImageViewport({ scale: 1, pan: { x: 0, y: 0 } })} className="rounded-xl bg-slate-800 px-3 py-2 text-sm font-bold text-white">원래 크기</button></div><div className="grid gap-5 lg:grid-cols-2"><div><p className="mb-3 rounded-xl bg-slate-100 py-3 text-center text-xl font-black sm:text-2xl">원본 · 비교용</p><ImageBoard src={puzzle.originalSrc} alt={`${puzzle.alt} 원본`} viewport={imageViewport} onPanBy={panImages} onSelect={() => setOriginalNoticeCount((count) => count + 1)}/></div><div><p className="mb-3 rounded-xl bg-violet-100 py-3 text-center text-xl font-black text-violet-800 sm:text-2xl">수정본 · 여기를 선택</p><ImageBoard src={puzzle.modifiedSrc} alt={`${puzzle.alt} 변경본`} marks={game.foundMarks} viewport={imageViewport} onPanBy={panImages} onSelect={inputLocked ? undefined : (point) => game.guess(puzzle.id, point)}/></div></div><div className="mt-5 flex justify-center">{inputLocked ? <span className="rounded-xl bg-red-100 px-5 py-3 font-black text-red-700">오답 · 1초 입력 잠금</span> : game.lastGuess && <span className={`rounded-xl px-5 py-3 font-black ${game.lastGuess.correct ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>{game.lastGuess.correct ? "정답!" : "오답"}</span>}</div></section>}
+    {game.snapshot.state === "PLAYING" && puzzle && <section data-testid="playing-screen" data-puzzle-id={puzzle.id} className="mx-auto max-w-6xl"><div className="mb-4 text-center"><h2 className="text-2xl font-black">{puzzle.label}</h2><p className="text-sm text-slate-500">수정본에서 차이 {me?.currentDifferenceCount ?? 0}개를 찾으세요. 다 찾으면 바로 다음 그림으로 이동합니다.</p></div><div className="mb-4 flex flex-wrap items-center justify-center gap-2" data-testid="zoom-controls"><span className="mr-1 inline-flex items-center gap-1 text-sm font-bold text-slate-600"><Move size={16}/>확대 후 드래그</span><button type="button" aria-label="축소" disabled={imageViewport.scale <= 1} onClick={() => changeZoom(-0.5)} className="rounded-xl bg-white p-2 shadow disabled:opacity-35"><Minus size={18}/></button><span className="min-w-14 text-center font-black">{imageViewport.scale.toFixed(1)}배</span><button type="button" aria-label="확대" disabled={imageViewport.scale >= 3} onClick={() => changeZoom(0.5)} className="rounded-xl bg-white p-2 shadow disabled:opacity-35"><Plus size={18}/></button><button type="button" onClick={() => setImageViewport({ scale: 1, pan: { x: 0, y: 0 } })} className="rounded-xl bg-slate-800 px-3 py-2 text-sm font-bold text-white">원래 크기</button></div><div className="grid gap-5 lg:grid-cols-2"><div><p className="mb-3 rounded-xl bg-slate-100 py-3 text-center text-xl font-black sm:text-2xl">원본 · 비교용</p><ImageBoard src={puzzle.originalSrc} alt={`${puzzle.alt} 원본`} viewport={imageViewport} onPanBy={panImages} onSelect={() => setOriginalNoticeCount((count) => count + 1)}/></div><div><p className="mb-3 rounded-xl bg-violet-100 py-3 text-center text-xl font-black text-violet-800 sm:text-2xl">수정본 · 여기를 선택</p><ImageBoard src={puzzle.modifiedSrc} alt={`${puzzle.alt} 변경본`} marks={game.foundMarks} viewport={imageViewport} onPanBy={panImages} onSelect={inputLocked ? undefined : (point) => game.guess(puzzle.id, point)}/></div></div><div className="mt-5 flex justify-center">{inputLocked ? <span className="rounded-xl bg-red-100 px-5 py-3 font-black text-red-700">오답 · {lockSeconds}초 입력 잠금</span> : game.lastGuess && <span className={`rounded-xl px-5 py-3 font-black ${game.lastGuess.correct ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>{game.lastGuess.correct ? "정답!" : "오답"}</span>}</div></section>}
 
     {game.snapshot.state === "PLAYING" && !puzzle && <section data-testid="deck-complete-screen" className="mx-auto max-w-xl rounded-3xl bg-white p-10 text-center shadow-xl"><div className="text-6xl">✅</div><h2 className="mt-4 text-2xl font-black">완료 · {me?.totalFoundCount ?? 0}/{me?.totalDifferenceCount ?? game.snapshot.totalDifferenceCount}</h2><p className="mt-3 text-slate-500">전체 문제를 완료했습니다. 결과를 확인하고 있습니다.</p></section>}
 
-    {game.snapshot.state === "FINISHED" && <section data-testid="finished-screen" className="mx-auto max-w-2xl rounded-3xl bg-white p-10 text-center shadow-xl"><div className="text-7xl">{game.snapshot.winnerId === game.match.playerId ? "🏆" : game.snapshot.winnerId ? "😿" : "🤝"}</div><h2 className="mt-4 text-3xl font-black">{game.snapshot.winnerId === game.match.playerId ? "승리했습니다!" : game.snapshot.winnerId ? "아쉽게 패배했습니다" : "무승부입니다"}</h2><p className="mt-2 text-slate-500">종료 사유: {game.snapshot.endReason === "COMPLETED" ? "전체 문제 먼저 완료" : game.snapshot.endReason === "TIMEOUT" ? "제한시간 종료" : game.snapshot.endReason === "FORFEIT" ? (game.snapshot.winnerId === game.match.playerId ? "상대 기권" : "본인 기권") : "경기 종료"}</p><div className="mt-6 grid gap-4 sm:grid-cols-2"><div className="rounded-2xl bg-violet-50 p-5"><p className="font-black">나</p><p className="mt-1 text-2xl font-black">{me?.completedAllPuzzles ? "완료" : "진행"} · {me?.totalFoundCount ?? 0}/{me?.totalDifferenceCount ?? game.snapshot.totalDifferenceCount}</p><p className="mt-2 font-black text-violet-700">총점 {formatScore(me?.score)}점</p><p className="text-sm text-slate-500">찾기 {(me?.totalFoundCount ?? 0) * 10}점 + 시간 {formatScore(me?.timeBonus)}점 · 오답 {me?.wrongAnswerCount ?? 0}</p></div><div className="rounded-2xl bg-slate-100 p-5"><p className="font-black">{opponent?.nickname}</p><p className="mt-1 text-2xl font-black">{opponent?.completedAllPuzzles ? "완료" : "진행"} · {opponent?.totalFoundCount ?? 0}/{opponent?.totalDifferenceCount ?? game.snapshot.totalDifferenceCount}</p><p className="mt-2 font-black text-slate-700">총점 {formatScore(opponent?.score)}점</p><p className="text-sm text-slate-500">찾기 {(opponent?.totalFoundCount ?? 0) * 10}점 + 시간 {formatScore(opponent?.timeBonus)}점</p></div></div><p className="mt-4 text-sm font-bold text-slate-500">차이점 1개당 10점, 전체 완료 시 남은 시간 1초당 0.5점을 더합니다.</p><button onClick={game.returnToLobby} className="mt-7 inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-7 py-4 font-black text-white"><RotateCcw size={19}/>로비로 돌아가기</button></section>}
+    {game.snapshot.state === "FINISHED" && <section data-testid="finished-screen" className="mx-auto max-w-2xl rounded-3xl bg-white p-10 text-center shadow-xl"><div className="text-7xl">{game.snapshot.winnerId === game.match.playerId ? "🏆" : game.snapshot.winnerId ? "😿" : "🤝"}</div><h2 className="mt-4 text-3xl font-black">{game.snapshot.winnerId === game.match.playerId ? "승리했습니다!" : game.snapshot.winnerId ? "아쉽게 패배했습니다" : "무승부입니다"}</h2><p className="mt-2 text-slate-500">종료 사유: {game.snapshot.endReason === "COMPLETED" ? "전체 문제 먼저 완료" : game.snapshot.endReason === "TIMEOUT" ? "제한시간 종료" : game.snapshot.endReason === "FORFEIT" ? (game.snapshot.winnerId === game.match.playerId ? "상대 기권" : "본인 기권") : game.snapshot.endReason === "MISTAKE_LIMIT" ? (game.snapshot.winnerId === game.match.playerId ? "상대 오답 3회" : "오답 3회") : "경기 종료"}</p><div className="mt-6 grid gap-4 sm:grid-cols-2"><div className="rounded-2xl bg-violet-50 p-5"><p className="font-black">나</p><p className="mt-1 text-2xl font-black">{me?.completedAllPuzzles ? "완료" : "진행"} · {me?.totalFoundCount ?? 0}/{me?.totalDifferenceCount ?? game.snapshot.totalDifferenceCount}</p><p className="mt-2 font-black text-violet-700">총점 {formatScore(me?.score)}점</p><p className="text-sm text-slate-500">찾기 {(me?.totalFoundCount ?? 0) * 10}점 + 시간 {formatScore(me?.timeBonus)}점 · 오답 {me?.wrongAnswerCount ?? 0}</p></div><div className="rounded-2xl bg-slate-100 p-5"><p className="font-black">{opponent?.nickname}</p><p className="mt-1 text-2xl font-black">{opponent?.completedAllPuzzles ? "완료" : "진행"} · {opponent?.totalFoundCount ?? 0}/{opponent?.totalDifferenceCount ?? game.snapshot.totalDifferenceCount}</p><p className="mt-2 font-black text-slate-700">총점 {formatScore(opponent?.score)}점</p><p className="text-sm text-slate-500">찾기 {(opponent?.totalFoundCount ?? 0) * 10}점 + 시간 {formatScore(opponent?.timeBonus)}점</p></div></div><p className="mt-4 text-sm font-bold text-slate-500">차이점 1개당 10점, 전체 완료 시 남은 시간 1초당 0.5점을 더합니다.</p><button onClick={game.returnToLobby} className="mt-7 inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-7 py-4 font-black text-white"><RotateCcw size={19}/>로비로 돌아가기</button></section>}
 
     {game.snapshot.state === "CANCELLED" && <section className="mx-auto max-w-2xl rounded-3xl bg-white p-10 text-center shadow-xl"><div className="text-7xl">🛠️</div><h2 className="mt-4 text-3xl font-black">경기가 취소되었습니다</h2><p className="mt-2 text-slate-500">{game.snapshot.cancelReason}</p><button onClick={game.returnToLobby} className="mt-7 rounded-2xl bg-violet-600 px-7 py-4 font-black text-white">로비로 돌아가기</button></section>}
 

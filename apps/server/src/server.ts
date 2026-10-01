@@ -196,7 +196,7 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
 
   function emitSnapshots(match: GameMatch): void {
     for (const player of match.snapshot().players) {
-      io.to(player.playerId).emit("game:snapshot", match.snapshot(player.playerId));
+      io.to(player.playerId).emit("game:snapshot", { ...match.snapshot(player.playerId), serverNowMs: Date.now() });
     }
     if (match.currentState !== "FINISHED" && match.currentState !== "CANCELLED") {
       void persistRuntime(match).catch((error) => app.log.error(error));
@@ -537,6 +537,16 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
           emitSnapshots(match);
           void persistIfFinished(match);
         }
+      } catch (error) {
+        handleActionError(socket, matchId, error);
+      }
+    });
+
+    socket.on("game:dismiss", (payload) => {
+      let matchId = "";
+      try {
+        matchId = requireStringField(payload, "matchId");
+        registry.release(matchId, session.playerId);
       } catch (error) {
         handleActionError(socket, matchId, error);
       }

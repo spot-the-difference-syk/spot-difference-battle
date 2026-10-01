@@ -71,6 +71,8 @@ pnpm build:cloudflare
 pnpm --filter @spot-battle/realtime dev
 ```
 
+로컬 실행과 `e2e:cloudflare`는 Hyperdrive 바인딩이 없는 `workers/realtime/wrangler.local.toml`을 사용한다. `wrangler dev`는 로컬 Postgres 연결 문자열 없이 Hyperdrive 바인딩을 거부하기 때문이다. `wrangler.toml`을 바꾸면 이 파일도 함께 맞춘다.
+
 `http://localhost:8787`을 서로 다른 두 브라우저 프로필에서 연다. 동일한 localStorage 토큰을 공유하는 두 탭은 동일 사용자라 두 플레이어로 매칭되지 않는다.
 
 자동 검사:

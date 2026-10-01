@@ -188,6 +188,9 @@ export class GameMatch {
 
   get currentState(): GameState { return this.state; }
   get version(): number { return this.stateVersion; }
+  get deadline(): number | null { return this.deadlineMs; }
+  get playerIds(): [string, string] { return [this.players[0].playerId, this.players[1].playerId]; }
+  get isTerminal(): boolean { return this.state === "FINISHED" || this.state === "CANCELLED"; }
 
   markReady(playerId: string, nowMs: number): void {
     this.requireState("READY");

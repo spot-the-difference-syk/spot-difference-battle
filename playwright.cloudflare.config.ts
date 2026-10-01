@@ -9,7 +9,7 @@ export default defineConfig({
   use: { baseURL: "http://127.0.0.1:8787", headless: true, trace: "retain-on-failure" },
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
   webServer: {
-    command: "pnpm build:packages && pnpm build:cloudflare && pnpm --filter @spot-battle/realtime exec wrangler dev --ip 127.0.0.1 --port 8787 --persist-to ../../.cloudflare-test-state",
+    command: "pnpm build:packages && pnpm build:cloudflare && pnpm --filter @spot-battle/realtime exec wrangler dev --config wrangler.local.toml --ip 127.0.0.1 --port 8787 --persist-to ../../.cloudflare-test-state",
     url: "http://127.0.0.1:8787/health",
     reuseExistingServer: false,
     timeout: 120_000,

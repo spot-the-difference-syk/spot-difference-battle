@@ -73,6 +73,8 @@ export interface ClientToServerEvents {
     puzzleId: GamePuzzleId;
     point: NormalizedPoint;
   }) => void;
+  /** 종료된 경기 결과 화면을 닫았다. 재접속해도 이 경기로 되돌아가지 않는다. */
+  "game:dismiss": (payload: { matchId: string }) => void;
   "game:forfeit": (payload: GameActionContext & { matchId: string }) => void;
   "game:report": (payload: GameActionContext & {
     matchId: string;
