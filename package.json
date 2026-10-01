@@ -27,7 +27,8 @@
     "setup": "pnpm install && pnpm build:packages",
     "pretest": "pnpm build:packages",
     "test": "pnpm test:r2-delivery && pnpm -r --if-present test",
-    "test:r2-delivery": "node --test workers/r2-delivery/test/index.test.mjs"
+    "test:r2-delivery": "node --test workers/r2-delivery/test/index.test.mjs",
+    "build:android:web": "pnpm --filter @spot-battle/web build"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1131.0",
