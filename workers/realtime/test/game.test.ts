@@ -215,7 +215,7 @@ describe("Cloudflare authoritative game", () => {
     const opponent = await h.add();
     await h.join(rich); await h.join(opponent);
     const found = opponent.frames.find((f) => f.event === "match:found")!.payload as MatchFoundPayload;
-    expect(found.opponentCosmetics).toEqual({ profile: "profile-sage", title: "title-visitor" });
+    expect(found.opponentCosmetics).toEqual({ avatar: "avatar-initial", profile: "profile-sage", title: "title-visitor" });
   });
   it("publishes the catalog without battle answers and sends each match its deck", async () => {
     const h = await harness();

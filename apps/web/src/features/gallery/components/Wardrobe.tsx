@@ -12,7 +12,7 @@ import { SOLO_PUZZLE_BY_ID } from "../../solo/puzzles/catalog";
 import { AppHeader, PaperScreen, Segmented, type AppTab } from "./Gallery";
 import { LevelAvatar, titleName } from "./Growth";
 
-const SLOT_OPTIONS = [["marker", "정답 표시"], ["frame", "액자"], ["profile", "프로필"], ["title", "칭호"]] as const;
+const SLOT_OPTIONS = [["marker", "정답 표시"], ["frame", "액자"], ["avatar", "프로필 그림"], ["profile", "테두리"], ["title", "칭호"]] as const;
 const PREVIEW = SOLO_PUZZLE_BY_ID.bakery;
 const PREVIEW_MARK = PREVIEW.differences[0]!.region;
 
@@ -33,10 +33,11 @@ function statusText(entry: CosmeticItem, state: ItemState): string {
 }
 
 function Swatch({ entry, nickname, locked }: { entry: CosmeticItem; nickname: string; locked: boolean }) {
-  const light = entry.slot === "profile" || entry.slot === "title";
+  const light = entry.slot === "avatar" || entry.slot === "profile" || entry.slot === "title";
   return <span className={`item-swatch ${light ? "light" : ""} ${locked ? "locked" : ""}`} aria-hidden>
     {entry.slot === "marker" && <span className={`found-mark ${entry.id}`}/>}
     {entry.slot === "frame" && <span className={`mini-frame ${entry.id}`}><img src={PREVIEW.originalSrc} alt=""/></span>}
+    {entry.slot === "avatar" && <LevelAvatar nickname={nickname} growth={null} size={52} avatar={entry.id}/>}
     {entry.slot === "profile" && <LevelAvatar nickname={nickname} growth={null} size={44} profile={entry.id}/>}
     {entry.slot === "title" && <span className="title-chip">{entry.name}</span>}
     {locked && <Lock size={14} className="absolute right-2 top-2 text-[var(--mute)]" style={{ opacity: 1 }}/>}

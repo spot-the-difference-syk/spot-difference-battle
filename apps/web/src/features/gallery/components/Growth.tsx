@@ -1,5 +1,15 @@
 import { COSMETIC_ITEM_BY_ID, type GrowthView, type RewardSummary } from "@spot-battle/shared";
 
+/** 프로필 그림. 파일 이름이 아이템 ID다(avatar-cat.svg → "avatar-cat"). */
+const AVATAR_IMAGES: Readonly<Record<string, string>> = Object.fromEntries(
+  Object.entries(import.meta.glob<string>("../../../assets/avatars/*.svg", { eager: true, query: "?url", import: "default" }))
+    .map(([path, url]) => [path.slice(path.lastIndexOf("/") + 1, -".svg".length), url]),
+);
+
+export function avatarImage(avatarId: string | undefined): string | undefined {
+  return avatarId ? AVATAR_IMAGES[avatarId] : undefined;
+}
+
 const RING_RADIUS = 22.5;
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
 
@@ -12,10 +22,13 @@ export function titleName(titleId: string | undefined): string {
   return (titleId && COSMETIC_ITEM_BY_ID[titleId]?.name) || "";
 }
 
-export function LevelAvatar({ nickname, growth, size = 38, profile }: { nickname: string; growth: GrowthView | null; size?: number; profile?: string }) {
+export function LevelAvatar({ nickname, growth, size = 38, profile, avatar }: { nickname: string; growth: GrowthView | null; size?: number; profile?: string; avatar?: string }) {
   const filled = growth ? levelRatio(growth) * RING_LENGTH : 0;
+  const image = avatarImage(avatar ?? growth?.loadout.avatar);
   return <span className={`level-avatar ${profile ?? growth?.loadout.profile ?? "profile-none"}`} style={{ width: size, height: size }}>
-    <span className="avatar" style={{ width: size, height: size, fontSize: Math.round(size * 0.36) }} aria-hidden>{nickname.slice(0, 1)}</span>
+    <span className={`avatar ${image ? "has-image" : ""}`} style={{ width: size, height: size, fontSize: Math.round(size * 0.36) }} aria-hidden>
+      {image ? <img src={image} alt="" draggable={false}/> : nickname.slice(0, 1)}
+    </span>
     {growth && <svg className="level-ring" viewBox="0 0 48 48" aria-hidden>
       <circle cx="24" cy="24" r={RING_RADIUS} className="track"/>
       {filled > 0 && <circle cx="24" cy="24" r={RING_RADIUS} className="fill" strokeDasharray={`${filled} ${RING_LENGTH}`}/>}

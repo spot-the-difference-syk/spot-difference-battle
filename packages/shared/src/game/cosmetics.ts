@@ -1,7 +1,7 @@
 import type { PlayerGrowth } from "./progression.js";
 
-/** 꾸밀 수 있는 자리. 정답 표시·액자는 내 화면에만, 프로필·칭호는 상대에게도 보인다. */
-export const COSMETIC_SLOTS = ["marker", "frame", "profile", "title"] as const;
+/** 꾸밀 수 있는 자리. 정답 표시·액자는 내 화면에만, 프로필 그림·테두리·칭호는 상대에게도 보인다. */
+export const COSMETIC_SLOTS = ["marker", "frame", "avatar", "profile", "title"] as const;
 export type CosmeticSlot = (typeof COSMETIC_SLOTS)[number];
 
 export interface CosmeticItem {
@@ -19,6 +19,7 @@ export type CosmeticLoadout = Record<CosmeticSlot, string>;
 
 /** 상대에게 보이는 꾸미기 */
 export interface PublicCosmetics {
+  avatar: string;
   profile: string;
   title: string;
 }
@@ -40,6 +41,16 @@ export const COSMETIC_ITEMS: readonly CosmeticItem[] = [
   item("frame", "frame-gold", "금빛 액자", "고전 회화 같은 금테", 1500, 5),
   item("frame", "frame-black", "검은 테", "얇고 단단한 검은 테", 2000, 8),
 
+  item("avatar", "avatar-initial", "첫 글자", "닉네임 첫 글자를 보여줘요", 0),
+  item("avatar", "avatar-palette", "화가의 팔레트", "물감이 묻은 팔레트와 붓", 600),
+  item("avatar", "avatar-loupe", "탐정 돋보기", "밤하늘색 바탕의 금빛 돋보기", 900),
+  item("avatar", "avatar-cat", "갤러리 고양이", "노란 눈의 검은 고양이", 1200),
+  item("avatar", "avatar-fox", "붉은 여우", "영리한 붉은 여우", 1500, 3),
+  item("avatar", "avatar-owl", "밤 부엉이", "별빛 아래 금빛 눈의 부엉이", 1800, 4),
+  item("avatar", "avatar-bloom", "온실의 꽃", "비밀의 온실에 핀 꽃", 2000, 5),
+  item("avatar", "avatar-moon", "달빛 천문대", "금빛 초승달과 별", 2500, 7),
+  item("avatar", "avatar-crown", "금빛 초상", "금 액자 속 왕관", 3000, 10),
+
   item("profile", "profile-none", "기본 테두리", "레벨 링만 보여요", 0),
   item("profile", "profile-sage", "세이지", "차분한 초록 테두리", 800),
   item("profile", "profile-gold", "금빛 테두리", "반짝이는 금색 테두리", 1500, 5),
@@ -56,6 +67,7 @@ export const COSMETIC_ITEM_BY_ID: Readonly<Record<string, CosmeticItem>> = Objec
 export const DEFAULT_LOADOUT: CosmeticLoadout = {
   marker: "marker-viewfinder",
   frame: "frame-none",
+  avatar: "avatar-initial",
   profile: "profile-none",
   title: "title-visitor",
 };
@@ -85,7 +97,7 @@ export function ownedItemIds(growth: Pick<PlayerGrowth, "ownedItems">, level: nu
 }
 
 export function publicCosmetics(loadout: CosmeticLoadout): PublicCosmetics {
-  return { profile: loadout.profile, title: loadout.title };
+  return { avatar: loadout.avatar, profile: loadout.profile, title: loadout.title };
 }
 
 export type CosmeticResult =

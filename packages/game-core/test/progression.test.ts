@@ -4,6 +4,7 @@ import {
   DEFAULT_LOADOUT,
   PROGRESSION_RULES,
   buyCosmetic,
+  publicCosmetics,
   equipCosmetic,
   emptyGrowth,
   settleMatch,
@@ -112,6 +113,20 @@ describe("player growth", () => {
     expect(equipCosmetic(rich, 4, "title-eye")).toMatchObject({ ok: false, code: "ITEM_LOCKED" });
     expect(equipCosmetic(rich, 5, "title-eye")).toMatchObject({ ok: true, growth: { loadout: { title: "title-eye" } } });
     expect(growthView({ ...rich, totalXp: 0 }).ownedItemIds).toEqual(COSMETIC_ITEMS.filter((item) => item.price === 0 && item.minLevel === 1).map((item) => item.id));
+  });
+
+  it("sells profile images for coins, shows them to the opponent and keeps old saves on the initial", () => {
+    const rich = { ...emptyGrowth(), coins: 3_000 };
+    expect(normalizeGrowth({ loadout: { frame: "frame-none" } }).loadout.avatar).toBe("avatar-initial");
+    expect(buyCosmetic(rich, 1, "avatar-fox")).toMatchObject({ ok: false, code: "ITEM_LOCKED" });
+    const bought = buyCosmetic(rich, 1, "avatar-cat");
+    expect(bought).toMatchObject({ ok: true, growth: { coins: 1_800, ownedItems: ["avatar-cat"], loadout: { avatar: "avatar-cat" } } });
+    if (!bought.ok) throw new Error("purchase failed");
+    expect(publicCosmetics(bought.growth.loadout)).toEqual({ avatar: "avatar-cat", profile: "profile-none", title: "title-visitor" });
+    for (const item of COSMETIC_ITEMS.filter((entry) => entry.slot === "avatar" && entry.price > 0)) {
+      expect(item.price).toBeGreaterThanOrEqual(500);
+      expect(item.price).toBeLessThanOrEqual(3_000);
+    }
   });
 
   it("gives every slot a free default item", () => {
