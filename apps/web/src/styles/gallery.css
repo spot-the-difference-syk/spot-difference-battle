@@ -1461,7 +1461,16 @@ body {
 
 /* ---------- pointer & press feedback ---------- */
 
-/* 누를 수 있는 곳은 손가락 포인터(PC 웹). 폰·앱은 포인터가 없으므로 누름 반응으로 알려준다. */
+/*
+ * 갤러리 포인터 세트(PC 웹): 금색 화살표 · 금빛 손톱의 손가락 · 금색 뷰파인더.
+ * 그림은 assets/cursors/*.svg(32×32). 숫자는 클릭 지점, 이미지 포인터를 못 쓰면 뒤의 기본 포인터를 쓴다.
+ * 폰·앱은 포인터가 없으므로 아래 누름 반응으로 알려준다.
+ */
+html {
+  cursor: url('../assets/cursors/arrow.svg') 5 3, auto;
+}
+
+/* 누를 수 있는 곳 */
 button:not(:disabled),
 [role='button']:not([aria-disabled='true']),
 a[href],
@@ -1470,7 +1479,14 @@ label[for],
 select,
 input[type='checkbox']:not(:disabled),
 input[type='radio']:not(:disabled) {
-  cursor: pointer;
+  cursor: url('../assets/cursors/hand.svg') 12 3, pointer;
+}
+
+/* 글자를 입력하는 곳은 기본 I자 포인터 */
+input:not([type='checkbox'], [type='radio'], [type='button'], [type='submit'], [type='range']),
+textarea,
+[contenteditable='true'] {
+  cursor: text;
 }
 
 button:disabled,
@@ -1505,12 +1521,9 @@ html {
   transform: scale(0.98);
 }
 
-/* 게임판: 찾은 표시와 같은 뷰파인더 포인터. 지원하지 않는 브라우저는 십자선. */
+/* 게임판: 찾은 표시와 어울리는 금색 뷰파인더 */
 .board-find {
-  cursor:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cpath d='M4 11V4h7M21 4h7v7M28 21v7h-7M11 28H4v-7' stroke='%23000' stroke-opacity='.55' stroke-width='5'/%3E%3Cpath d='M4 11V4h7M21 4h7v7M28 21v7h-7M11 28H4v-7' stroke='%23fff' stroke-width='2.5'/%3E%3C/g%3E%3Ccircle cx='16' cy='16' r='3' fill='%23fff' stroke='%23000' stroke-opacity='.55' stroke-width='1.5'/%3E%3C/svg%3E")
-      16 16,
-    crosshair;
+  cursor: url('../assets/cursors/find.svg') 16 16, crosshair;
 }
 
 /* 확대한 원본 그림은 끌어서 옮긴다. */
