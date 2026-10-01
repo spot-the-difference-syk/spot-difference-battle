@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GameSnapshot, MatchFoundPayload, PlayerGrowthPayload } from "@spot-battle/shared";
 import { GAME_PUZZLES } from "../../../apps/server/src/game/puzzle-catalog.js";
-import { RealtimeGame, type Archive, type Peer, type Storage } from "../src/game.js";
+import { RealtimeGame, tokenHash, type Archive, type GrowthBackup, type Peer, type Storage } from "../src/game.js";
 import { allowedOrigin } from "../src/index.js";
 
 class MemoryStorage implements Storage {
@@ -40,7 +40,7 @@ async function harness(archive?: Archive, catalog = [GAME_PUZZLES[0]!]) {
     now += 3000; await game.alarm();
     return { first, second };
   };
-  return { storage, peers, add, snapshot, token, action, join, start, get game() { return game; }, advance(ms: number) { now += ms; }, async restore() { game = new RealtimeGame(storage, () => peers, catalog, archive, () => now); await game.restore(); }, async disconnect(p: TestPeer) { p.close(); await game.disconnect(p); } };
+  return { storage, peers, add, snapshot, token, action, join, start, get game() { return game; }, get now() { return now; }, advance(ms: number) { now += ms; }, async restore() { game = new RealtimeGame(storage, () => peers, catalog, archive, () => now); await game.restore(); }, async disconnect(p: TestPeer) { p.close(); await game.disconnect(p); } };
 }
 
 describe("Cloudflare authoritative game", () => {
@@ -219,6 +219,95 @@ describe("Cloudflare authoritative game", () => {
   it("stamps snapshots with the server clock", async () => {
     const h = await harness(); const { first } = await h.start();
     expect(typeof h.snapshot(first).serverNowMs).toBe("number");
+  });
+  describe("Supabase growth backup", () => {
+    function backupArchive() {
+      const rows = new Map<string, GrowthBackup>();
+      const state = { failSave: false, failFind: false, saves: 0 };
+      const archive: Archive = {
+        async save() {}, async report() { return "report"; },
+        async saveGrowth(batch) {
+          state.saves += 1;
+          if (state.failSave) throw new Error("offline");
+          for (const row of batch) rows.set(row.playerId, structuredClone(row));
+        },
+        async findGrowth(hash) {
+          if (state.failFind) throw new Error("offline");
+          const row = [...rows.values()].find((candidate) => candidate.tokenHash === hash);
+          return row ? { playerId: row.playerId, growth: row.growth } : null;
+        },
+      };
+      return { rows, state, archive };
+    }
+    const solo = (h: Awaited<ReturnType<typeof harness>>, peer: TestPeer) => h.game.action(peer, "solo:complete", { puzzleId: "observatory", elapsedMs: 40_000 });
+    const lastGrowth = (peer: TestPeer) => peer.frames.filter((f) => f.event === "player:growth").at(-1)!.payload as PlayerGrowthPayload;
+
+    it("backs up changed growth in batches with a token hash, and retries after a failure", async () => {
+      const db = backupArchive(); const h = await harness(db.archive);
+      const a = await h.add(); const b = await h.add();
+      await solo(h, a); await solo(h, b); await solo(h, a);
+      expect(h.storage.alarm).toBe(1_000_000 + 10_000);
+      await h.game.alarm();
+      expect(db.state.saves).toBe(0);
+      h.advance(10_000); await h.game.alarm();
+      expect(db.state.saves).toBe(1);
+      expect(db.rows.get(a.playerId!)!.growth).toMatchObject({ totalXp: 60, coins: 40 });
+      expect(db.rows.get(a.playerId!)!.tokenHash).toBe(await tokenHash(h.token(a)));
+      expect(JSON.stringify([...db.rows.values()])).not.toContain(h.token(a));
+      h.advance(60_000); await h.game.alarm();
+      expect(db.state.saves).toBe(1);
+
+      db.state.failSave = true;
+      await solo(h, b);
+      h.advance(10_000); await h.game.alarm();
+      expect(db.state.saves).toBe(2);
+      expect(db.rows.get(b.playerId!)!.growth.totalXp).toBe(30);
+      // 실패하면 1분 뒤에 다시 시도한다(쉬지 않고 반복하지 않음).
+      expect(h.storage.alarm).toBe(h.now + 60_000);
+      h.advance(30_000); await h.game.alarm();
+      expect(db.state.saves).toBe(2);
+      db.state.failSave = false;
+      await h.restore();
+      h.advance(30_000); await h.game.alarm();
+      expect(db.rows.get(b.playerId!)!.growth.totalXp).toBe(60);
+    });
+
+    it("restores a player removed from the Durable Object by their device token", async () => {
+      const db = backupArchive(); const h = await harness(db.archive);
+      const player = await h.add(); const token = h.token(player); const playerId = player.playerId!;
+      await solo(h, player);
+      h.advance(10_000); await h.game.alarm();
+      await h.disconnect(player);
+      h.advance(181 * 24 * 60 * 60_000); await h.game.alarm();
+      expect(h.storage.data.has(`session:${playerId}`)).toBe(false);
+
+      db.state.failFind = true;
+      const blocked = await h.add(token);
+      expect(blocked.frames.map((f) => f.event)).toEqual(["game:error"]);
+      db.state.failFind = false;
+      const back = await h.add(token);
+      expect(back.playerId).toBe(playerId);
+      expect(h.token(back)).toBe(token);
+      expect(lastGrowth(back).progress).toMatchObject({ totalXp: 30, coins: 20 });
+
+      const stranger = await h.add(crypto.randomUUID());
+      expect(stranger.playerId).not.toBe(playerId);
+      expect(lastGrowth(stranger).progress.totalXp).toBe(0);
+    });
+
+    it("never expires growth that is not backed up yet", async () => {
+      const db = backupArchive(); db.state.failSave = true;
+      const h = await harness(db.archive);
+      const player = await h.add(); await solo(h, player); await h.disconnect(player);
+      h.advance(181 * 24 * 60 * 60_000); await h.game.alarm();
+      expect(h.storage.data.has(`session:${player.playerId}`)).toBe(true);
+      expect(h.storage.alarm).toBe(h.now + 60_000);
+      db.state.failSave = false;
+      h.advance(60_000); await h.game.alarm();
+      expect(db.rows.get(player.playerId!)!.growth.totalXp).toBe(30);
+      h.advance(1); await h.game.alarm();
+      expect(h.storage.data.has(`session:${player.playerId}`)).toBe(false);
+    });
   });
   it("expires anonymous sessions after an hour but keeps named ones", async () => {
     const h = await harness();

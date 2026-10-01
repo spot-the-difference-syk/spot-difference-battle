@@ -18,17 +18,37 @@ interface Session {
   lastSeenAt: number;
   reconnectAt: number | null;
   lastGuessAt?: number;
-  /** 레벨·코인. 보상은 이 객체에만 기록해 세션과 함께 저장된다. */
+  /** 레벨·코인. 보상은 이 객체에 먼저 기록하고(DO 저장소), 뒤이어 Supabase에 백업한다. */
   growth?: PlayerGrowth;
+  /** growth가 바뀔 때마다 1씩 오른다. */
+  growthRev?: number;
+  /** Supabase에 저장을 마친 growthRev */
+  growthSavedRev?: number;
 }
 interface StoredMatch { state: PersistedMatchState; finishedAt: number | null; archived: boolean; retiredPlayers?: string[] }
 interface LiveMatch { match: GameMatch; finishedAt: number | null; archived: boolean; retiredPlayers?: string[] }
 interface Waiting { playerId: string; nickname: string; settings: MatchSettings }
 export interface Peer { id: string; playerId?: string; send(event: string, payload?: unknown): void; close(): void }
+export interface GrowthBackup {
+  playerId: string;
+  /** 기기 토큰의 SHA-256. 토큰 원문은 DB에 저장하지 않는다. */
+  tokenHash: string;
+  growth: PlayerGrowth;
+}
 export interface Archive {
   save(state: PersistedMatchState): Promise<void>;
   report(input: { matchId: string; reporterPlayerId: string; reason: "UNFAIR" | "INAPPROPRIATE" | "SYSTEM_ERROR" | "OTHER"; details?: string }): Promise<string>;
+  /** 성장 기록 백업(upsert). 없으면 DO 저장소에만 둔다. */
+  saveGrowth?(rows: GrowthBackup[]): Promise<void>;
+  /** DO에서 지워진 세션을 기기 토큰 해시로 되찾는다. */
+  findGrowth?(tokenHash: string): Promise<{ playerId: string; growth: unknown } | null>;
 }
+
+export async function tokenHash(token: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+const GUEST_TOKEN_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const terminal = (match: GameMatch) => match.isTerminal;
 const RETENTION = 5 * 60_000;
 const SESSION_RETENTION = 7 * 24 * 60 * 60_000;
@@ -40,6 +60,10 @@ const MAX_SESSIONS = 5_000;
 const MAX_MATCHES = 100;
 /** Bound external database I/O per alarm. */
 const ARCHIVE_BATCH = 10;
+/** 성장 기록은 바뀐 뒤 이 시간 안에 모아서 Supabase에 백업한다. */
+const GROWTH_SYNC_DELAY_MS = 10_000;
+const GROWTH_RETRY_MS = 60_000;
+const GROWTH_BATCH = 100;
 const GUESS_INTERVAL_MS = 120;
 
 function object(value: unknown): Record<string, unknown> {
@@ -59,6 +83,8 @@ export class RealtimeGame {
   private emissions: Array<() => void> = [];
   private persisted = new Map<string, string>();
   private evicted: string[] = [];
+  /** 다음 성장 기록 백업 시각. 백업할 것이 없으면 null */
+  private growthDueAt: number | null = null;
 
   constructor(
     private storage: Storage,
@@ -121,14 +147,33 @@ export class RealtimeGame {
   }
 
   async authenticate(peer: Peer, token: unknown): Promise<void> {
-    const session = typeof token === "string" && token ? [...this.sessions.values()].find((s) => s.guestToken === token) : undefined;
+    const byToken = () => typeof token === "string" && token ? [...this.sessions.values()].find((s) => s.guestToken === token) : undefined;
+    let session = byToken();
+    let restored: Session | undefined;
+    if (!session && typeof token === "string" && GUEST_TOKEN_PATTERN.test(token) && this.archive?.findGrowth) {
+      // 오래 접속하지 않아 DO에서 정리된 플레이어는 Supabase 백업에서 레벨·코인을 되찾는다.
+      let found: { playerId: string; growth: unknown } | null;
+      try {
+        found = await this.archive.findGrowth(await tokenHash(token));
+      } catch {
+        // 새 토큰을 발급하면 기존 기록과 영영 끊기므로, DB 장애 중에는 잠시 뒤 다시 시도하게 한다.
+        console.error(JSON.stringify({ event: "database.growth_lookup_failed" }));
+        this.emit(peer, "game:error", { code: "SERVER_BUSY", message: "잠시 후 다시 시도해주세요." });
+        await this.checkpoint();
+        return;
+      }
+      session = byToken();
+      if (!session && found && !this.sessions.has(found.playerId)) {
+        restored = { playerId: found.playerId, guestToken: token, nickname: null, lastSeenAt: this.now(), reconnectAt: null, growth: normalizeGrowth(found.growth), growthRev: 1, growthSavedRev: 1 };
+      }
+    }
     if (!session && this.sessions.size >= MAX_SESSIONS && !this.evictIdleSession()) {
       this.emit(peer, "game:error", { code: "SERVER_BUSY", message: "접속자가 많습니다. 잠시 후 다시 시도해주세요." });
       // The unauthenticated socket is closed by the auth deadline and the client retries later.
       await this.checkpoint();
       return;
     }
-    const active = session ?? { playerId: crypto.randomUUID(), guestToken: crypto.randomUUID(), nickname: null, lastSeenAt: this.now(), reconnectAt: null };
+    const active = session ?? restored ?? { playerId: crypto.randomUUID(), guestToken: crypto.randomUUID(), nickname: null, lastSeenAt: this.now(), reconnectAt: null };
     this.sessions.set(active.playerId, active);
     for (const old of this.peers()) if (old.id !== peer.id && old.playerId === active.playerId) old.close();
     peer.playerId = active.playerId;
@@ -173,7 +218,7 @@ export class RealtimeGame {
         const level = growthView(growth, this.now()).level;
         const result = event === "shop:buy" ? buyCosmetic(growth, level, itemId) : equipCosmetic(growth, level, itemId);
         if (!result.ok) throw new GameRuleError(result.code, result.message);
-        session.growth = result.growth;
+        this.setGrowth(session, result.growth);
         this.emit(peer, "player:growth", this.growthPayload(session));
       } else if (event === "solo:complete") {
         const input = object(payload);
@@ -181,7 +226,7 @@ export class RealtimeGame {
         const before = this.growthOf(session);
         const soloId = (SOLO_PUZZLE_IDS as readonly string[]).includes(input.puzzleId) ? input.puzzleId : undefined;
         const result = grantSoloReward(before, input.elapsedMs, this.now(), soloId);
-        if (result.progress !== before) session.growth = result.progress;
+        if (result.progress !== before) this.setGrowth(session, result.progress);
         this.emit(peer, "player:growth", this.growthPayload(session, {
           ...(result.reward ? { reward: result.reward } : {}),
           ...(result.limitReached ? { soloLimitReached: true } : {}),
@@ -315,6 +360,28 @@ export class RealtimeGame {
     await this.advance();
     await this.checkpoint();
     await this.flushArchive();
+    await this.flushGrowth();
+  }
+
+  /** 바뀐 성장 기록을 모아 Supabase에 백업한다. 실패하면 DO에 그대로 두고 나중에 다시 시도한다. */
+  async flushGrowth(): Promise<void> {
+    if (!this.archive?.saveGrowth || this.growthDueAt === null || this.now() < this.growthDueAt) return;
+    const batch = [...this.sessions.values()].filter((session) => this.growthUnsaved(session)).slice(0, GROWTH_BATCH);
+    const revs = batch.map((session) => session.growthRev ?? 0);
+    try {
+      if (batch.length) {
+        await this.archive.saveGrowth(await Promise.all(batch.map(async (session) => ({
+          playerId: session.playerId, tokenHash: await tokenHash(session.guestToken), growth: session.growth!,
+        }))));
+      }
+      // 저장하는 동안 다시 바뀐 기록은 다음 차례에 저장된다.
+      batch.forEach((session, index) => { session.growthSavedRev = revs[index]; });
+      this.growthDueAt = null;
+    } catch {
+      console.error(JSON.stringify({ event: "database.growth_save_failed", count: batch.length }));
+      this.growthDueAt = this.now() + GROWTH_RETRY_MS;
+    }
+    await this.checkpoint();
   }
 
   async flushArchive(): Promise<void> {
@@ -343,6 +410,16 @@ export class RealtimeGame {
     return session.nickname === null ? ANONYMOUS_SESSION_RETENTION : SESSION_RETENTION;
   }
 
+  private setGrowth(session: Session, growth: PlayerGrowth): void {
+    session.growth = growth;
+    session.growthRev = (session.growthRev ?? 0) + 1;
+  }
+
+  /** Supabase 백업을 쓰는 환경에서 아직 백업하지 못한 기록이 있는지 */
+  private growthUnsaved(session: Session): boolean {
+    return !!this.archive?.saveGrowth && !!session.growth && (session.growthRev ?? 0) !== (session.growthSavedRev ?? 0);
+  }
+
   private growthOf(session: Session): PlayerGrowth {
     return session.growth ? normalizeGrowth(session.growth) : emptyGrowth();
   }
@@ -368,7 +445,7 @@ export class RealtimeGame {
         if (!session) continue;
         const settled = settleMatch(this.growthOf(session), match.matchId, snapshot, player.playerId, matchJourney(state, player.playerId), this.now());
         if (!settled) continue;
-        session.growth = settled.progress;
+        this.setGrowth(session, settled.progress);
         const payload = this.growthPayload(session, { ...(settled.reward ? { reward: settled.reward } : {}), matchId: match.matchId });
         for (const peer of this.peers()) if (peer.playerId === player.playerId) this.emit(peer, "player:growth", payload);
       }
@@ -379,13 +456,14 @@ export class RealtimeGame {
   private evictIdleSession(): boolean {
     const activeIds = new Set(this.peers().map((p) => p.playerId));
     let oldest: Session | undefined;
-    const hasGrowth = (session: Session) => (session.growth?.totalXp ?? 0) > 0;
+    // 레벨이 없는 손님 → Supabase에 백업된 기록 → 아직 백업 못 한 기록 순으로 정리한다.
+    const rank = (session: Session) => (session.growth?.totalXp ?? 0) <= 0 ? 0 : this.growthUnsaved(session) ? 2 : 1;
     for (const session of this.sessions.values()) {
       if (activeIds.has(session.playerId) || this.current(session.playerId)) continue;
-      // Evict guests without levels before anyone who has earned progress.
-      if (!oldest || (hasGrowth(oldest) && !hasGrowth(session)) || (hasGrowth(oldest) === hasGrowth(session) && session.lastSeenAt < oldest.lastSeenAt)) oldest = session;
+      if (!oldest || rank(session) < rank(oldest) || (rank(session) === rank(oldest) && session.lastSeenAt < oldest.lastSeenAt)) oldest = session;
     }
     if (!oldest) return false;
+    if (rank(oldest) === 2) console.error(JSON.stringify({ event: "game.unsaved_growth_evicted" }));
     this.sessions.delete(oldest.playerId);
     this.evicted.push(oldest.playerId);
     return true;
@@ -432,7 +510,7 @@ export class RealtimeGame {
     }
     const activeIds = new Set(this.peers().map((p) => p.playerId));
     for (const [id, session] of this.sessions) {
-      if (!activeIds.has(id) && !this.current(id) && now >= session.lastSeenAt + this.sessionRetention(session)) {
+      if (!activeIds.has(id) && !this.current(id) && !this.growthUnsaved(session) && now >= session.lastSeenAt + this.sessionRetention(session)) {
         this.sessions.delete(id);
         await storage.delete(`session:${id}`);
       } else await this.putChanged(storage, `session:${id}`, session);
@@ -443,9 +521,14 @@ export class RealtimeGame {
       if (!terminal(live.match) && deadline !== null) deadlines.push(deadline);
       if (live.finishedAt !== null) deadlines.push(live.archived ? live.finishedAt + RETENTION : now + 30_000);
     }
+    if ([...this.sessions.values()].some((session) => this.growthUnsaved(session))) {
+      this.growthDueAt ??= now + GROWTH_SYNC_DELAY_MS;
+      deadlines.push(this.growthDueAt);
+    }
     for (const session of this.sessions.values()) {
       if (session.reconnectAt) deadlines.push(session.reconnectAt);
-      if (!activeIds.has(session.playerId) && !this.current(session.playerId)) deadlines.push(session.lastSeenAt + this.sessionRetention(session));
+      // 백업 전인 기록은 만료하지 않으므로 백업 시각(growthDueAt)이 다음 알람이 된다.
+      if (!activeIds.has(session.playerId) && !this.current(session.playerId) && !this.growthUnsaved(session)) deadlines.push(session.lastSeenAt + this.sessionRetention(session));
     }
     if (deadlines.length) await storage.setAlarm(Math.max(now + 1, Math.min(...deadlines)));
     else await storage.deleteAlarm();
