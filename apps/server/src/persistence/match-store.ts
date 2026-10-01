@@ -201,27 +201,6 @@ export class SupabasePostgresMatchStore implements MatchStore {
     );
   }
 
-  /** Cloudflare Worker의 성장 기록 백업. 여러 명을 한 번의 쿼리로 저장한다. */
-  async saveGrowthBatch(rows: ReadonlyArray<{ playerId: string; tokenHash: string; growth: PlayerGrowth }>): Promise<void> {
-    if (!rows.length) return;
-    await this.pool.query(
-      `INSERT INTO player_growth (player_id, token_hash, growth)
-       SELECT * FROM unnest($1::uuid[], $2::text[], $3::jsonb[])
-       ON CONFLICT (player_id) DO UPDATE
-       SET token_hash = EXCLUDED.token_hash, growth = EXCLUDED.growth, updated_at = NOW()`,
-      [rows.map((row) => row.playerId), rows.map((row) => row.tokenHash), rows.map((row) => JSON.stringify(row.growth))],
-    );
-  }
-
-  async findGrowthByTokenHash(tokenHash: string): Promise<{ playerId: string; growth: unknown } | null> {
-    const result = await this.pool.query<{ player_id: string; growth: unknown }>(
-      "SELECT player_id, growth FROM player_growth WHERE token_hash = $1",
-      [tokenHash],
-    );
-    const row = result.rows[0];
-    return row ? { playerId: row.player_id, growth: row.growth } : null;
-  }
-
   async saveMatch(snapshot: GameSnapshot, state: PersistedMatchState): Promise<void> {
     const client = await this.pool.connect();
     try {
