@@ -21,6 +21,7 @@
   - `server/`: 로컬 개발용 Fastify·Socket.IO 서버. `src/game/`(카탈로그)·`src/persistence/`(Supabase 저장소)는 운영 Worker도 가져다 쓴다.
     - `test/unit/`, `test/integration/`
   - `android/`: Android WebView 래퍼(Gradle)
+  - `ios/`: iOS 앱(Capacitor, `ios/App`이 Xcode 프로젝트)
 - `workers/`
   - `realtime/`: 운영 게임 Worker(Durable Object `GameLobby`, 정적 웹, `/ws`, `/catalog`, `/health`)
   - `r2-delivery/`: R2 이미지 전달 Worker
@@ -28,7 +29,7 @@
   - `shared/`: 게임 설정, 공유 타입, 통신 계약, 그림 매니페스트·카탈로그 타입, 성장·꾸미기 규칙
   - `game-core/`: 좌표 판정·점수·경기 상태 머신(`test/` 포함)
 - `supabase/migrations/`: DB 스키마
-- `scripts/`: 빌드(`build-cloudflare.mjs`, `copy-android-web.mjs`), 그림 등록(`puzzle-publish.mjs`), 구조 검사
+- `scripts/`: 빌드(`build-cloudflare.mjs`: 웹·앱인토스·Android·iOS), 운영 서버 주소(`production.config.json`), 그림 등록(`puzzle-publish.mjs`), 구조 검사
 - `tests/e2e/`: 웹과 서버를 함께 실행하는 Playwright 시스템 테스트
 - `docs/`: 현재 명세(`design/` 포함)와 `history/`(과거 기록)
 

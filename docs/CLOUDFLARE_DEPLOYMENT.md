@@ -31,19 +31,19 @@ pnpm deploy:cloudflare
 
 ## 앱인토스 번들
 
-배포 후 위에서 얻은 주소를 사용한다.
-
 ```powershell
-$env:VITE_SERVER_URL="https://<실제-game-worker-주소>"
 pnpm build:ait:cloudflare
 ```
 
-생성한 `apps/web/spot-difference-syk.ait`를 앱인토스 콘솔에 업로드하고 QR로 2인 대전을 검증한다. Worker 주소 없이 AIT 빌드를 요청하면 빌드 스크립트가 오류를 낸다. AIT 화면의 Origin에서 서버를 찾는 잘못된 연결을 방지하기 위해서다.
+접속할 Worker 주소는 `scripts/production.config.json`에서 읽는다. 다른 Worker로 시험하려면 `VITE_SERVER_URL`을 준다. 생성한 `apps/web/spot-difference-syk.ait`를 앱인토스 콘솔에 업로드하고 QR로 2인 대전을 검증한다. Android·iOS 앱도 같은 주소를 쓴다(`MOBILE_APPS.md`).
 
-WebSocket Origin은 같은 웹 사이트와 다음 AIT 주소만 허용한다. 앱 ID나 별도 웹 주소가 달라지면 `ALLOWED_ORIGINS`를 수정해 배포한다.
+WebSocket·`/catalog`는 같은 웹 사이트와 다음 주소만 허용한다. 앱 ID나 별도 주소가 달라지면 `ALLOWED_ORIGINS`를 수정해 배포한다.
 
-- `https://spot-difference-syk.web.tossmini.com`
-- `https://spot-difference-syk.private-web.tossmini.com`
+- `https://spot-difference-syk.web.tossmini.com`, `https://spot-difference-syk.private-web.tossmini.com` (앱인토스)
+- `https://appassets.androidplatform.net` (Android 앱)
+- `capacitor://localhost` (iOS 앱)
+
+앱·앱인토스 번들이 접속할 Worker 주소는 `scripts/production.config.json`에 있다(`MOBILE_APPS.md`).
 
 ## Supabase 연결
 

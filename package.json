@@ -11,6 +11,8 @@
     "build:ait": "pnpm --filter @spot-battle/web build:ait",
     "build:cloudflare": "node scripts/build-cloudflare.mjs web",
     "build:ait:cloudflare": "node scripts/build-cloudflare.mjs ait",
+    "build:android": "node scripts/build-cloudflare.mjs android",
+    "build:ios": "node scripts/build-cloudflare.mjs ios",
     "deploy:cloudflare": "pnpm build:packages && pnpm build:cloudflare && pnpm --filter @spot-battle/realtime run deploy",
     "e2e:cloudflare": "playwright test --config playwright.cloudflare.config.ts",
     "build:packages": "pnpm --filter @spot-battle/shared --filter @spot-battle/game-core build",
@@ -29,9 +31,7 @@
     "test": "pnpm test:r2-delivery && pnpm test:scripts && pnpm -r --if-present test",
     "test:r2-delivery": "node --test workers/r2-delivery/test/index.test.mjs",
     "test:scripts": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test scripts/puzzle-publish.test.mjs",
-    "build:android:web": "pnpm --filter @spot-battle/web build",
-    "copy:android:web": "node scripts/copy-android-web.mjs",
-    "package:android:web": "pnpm build:android:web && pnpm copy:android:web"
+    "package:android:web": "pnpm build:android"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1131.0",

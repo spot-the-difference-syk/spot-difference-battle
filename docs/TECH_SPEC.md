@@ -11,7 +11,8 @@
 | 게임 Worker | Cloudflare Workers + Durable Object(`GameLobby`, SQLite 저장소) | 웹 정적 파일, `/ws` 실시간 대결, `/catalog`, `/health`, 게스트 세션·성장 기록 |
 | 이미지 | R2 + 전달 Worker | `puzzles/{id}/{version}/runtime/{original\|modified}.webp` 제공 |
 | DB | Supabase PostgreSQL(Hyperdrive) | 그림 목록·정답, 종료 경기, 신고, 성장 기록 백업 |
-| 웹 | React 18 + Vite + Tailwind v4 | 화면, 좌표 변환, 이미지 사전 로드. 웹·앱인토스·Android 공용 |
+| 웹 | React 18 + Vite + Tailwind v4 | 화면, 좌표 변환, 이미지 사전 로드. 웹·앱인토스·Android·iOS 공용 |
+| 모바일 앱 | Android WebView 래퍼, iOS Capacitor | 웹 번들을 앱 안에 넣어 실행(`MOBILE_APPS.md`) |
 | 공유 | `packages/shared` | 수치·타입·통신 계약·성장/꾸미기 규칙·카탈로그 타입 |
 | 게임 코어 | `packages/game-core` | 플레이어별 진행, 입력 잠금, 마감, 결과 판정 |
 | 개발 서버 | `apps/server`(Fastify + Socket.IO) | 로컬 개발·자동 테스트 전용. Worker와 카탈로그·저장소 코드를 공유한다 |
@@ -60,7 +61,7 @@ Worker는 `apps/server`의 `CatalogService`, `parseCatalog`, `SupabasePostgresMa
 - 상태·그림·버전이 다른 입력은 거절하고, 동일 정답 중복과 입력 잠금 중 요청은 무시한다.
 - 마감과 순서는 서버 수신 시각으로 판정하고, 선택 요청에 속도 제한(120ms)을 둔다.
 - 보상·코인은 클라이언트 값을 믿지 않는다. 3초보다 빠른 솔로 완주는 보상하지 않는다.
-- WebSocket·`/catalog`는 허용된 Origin(같은 사이트, 앱인토스 주소)에만 연다.
+- WebSocket·`/catalog`는 허용된 Origin(같은 사이트, 앱인토스·Android·iOS 앱 주소)에만 연다.
 - DB 연결 문자열·R2 키는 저장소와 브라우저에 넣지 않는다.
 
 ## 빌드 경로
@@ -68,8 +69,11 @@ Worker는 `apps/server`의 `CatalogService`, `parseCatalog`, `SupabasePostgresMa
 | 명령 | 연결 대상 | 용도 |
 |---|---|---|
 | `pnpm build:cloudflare` | 같은 Worker의 `/ws` | 운영 웹(자동 배포) |
-| `pnpm build:ait:cloudflare` | `VITE_SERVER_URL`의 Worker | 토스에 올리는 앱인토스 번들 |
-| `pnpm build:ait`, `pnpm package:android:web` | Socket.IO(Node 서버) | 로컬 개발·CI 빌드 확인용 |
+| `pnpm build:ait:cloudflare` | 운영 Worker | 토스에 올리는 앱인토스 번들 |
+| `pnpm build:android`, `pnpm build:ios` | 운영 Worker | Android·iOS 앱 |
+| `pnpm build:ait` | Socket.IO(Node 서버) | 로컬 개발·CI 빌드 확인용 |
+
+앱·앱인토스 번들의 운영 Worker 주소는 `scripts/production.config.json` 한 곳에서 관리한다(`VITE_SERVER_URL`로 덮어쓸 수 있음). 앱 Origin(`https://appassets.androidplatform.net`, `capacitor://localhost`)은 Worker `ALLOWED_ORIGINS`에 있다.
 
 ## DB 변경
 

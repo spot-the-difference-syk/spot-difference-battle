@@ -4,7 +4,7 @@
 > 기준일: 2026-10-01
 > 게임 규칙의 유일한 Markdown 정본은 [`docs/GAME_RULES.md`](docs/GAME_RULES.md)다.
 
-같은 그림 두 장에서 다른 곳을 찾는 게임이다. 웹·앱인토스·Android(WebView)로 제공한다.
+같은 그림 두 장에서 다른 곳을 찾는 게임이다. 웹·앱인토스·Android·iOS로 제공한다.
 
 - **1대1 대결**: 두 사람이 같은 순서의 그림 10점을 동시에 푼다. 그림마다 차이 3개를 찾으면 각자 다음 그림으로 넘어가고, 전체를 먼저 끝낸 사람이 즉시 이긴다. 시간이 끝나면 점수·오답 순으로 판정한다.
 - **혼자하기(솔로 타임어택)**: 어려운 차이 5개를 찾는 시간을 줄인다. 퍼즐별 최고 기록은 기기에 저장한다.
@@ -26,6 +26,7 @@ main에 머지하면 Cloudflare가 자동으로 다시 배포한다. 자세한 �
 - `apps/web/`: React·Vite 웹 앱(앱인토스·Android 공용), 앱에 들어 있는 기본 그림
 - `apps/server/`: 로컬 개발용 Fastify·Socket.IO 서버, Worker와 공유하는 카탈로그·저장소 코드
 - `apps/android/`: Android WebView 래퍼
+- `apps/ios/`: iOS 앱(Capacitor)
 - `workers/realtime/`: 운영 게임 Worker
 - `workers/r2-delivery/`: R2 이미지 전달 Worker
 - `packages/shared/`: 공유 규칙·타입·통신 계약·성장/꾸미기 규칙
@@ -42,7 +43,7 @@ main에 머지하면 Cloudflare가 자동으로 다시 배포한다. 자세한 �
 - 규칙·기획: [게임 규칙](docs/GAME_RULES.md) · [게임 모드](docs/GAME_MODES.md) · [게임 기획](docs/GAME_DESIGN.md) · [결정 기록](docs/MVP_DECISIONS.md)
 - 화면·흐름: [사용자 흐름](docs/USER_FLOW.md) · [화면 명세](docs/SCREEN_SPEC.md) · [UI 구현 기준](docs/design/UI_GUIDELINES.md)
 - 기술: [기술 설계](docs/TECH_SPEC.md) · [게임 상태](docs/GAME_STATE.md) · [DB 설계](docs/DATABASE_DESIGN.md)
-- 운영: [Cloudflare 배포](docs/CLOUDFLARE_DEPLOYMENT.md) · [그림 에셋·등록](docs/GAME_ASSETS.md) · [Android 빌드 환경](docs/android-build-environment.md)
+- 운영: [Cloudflare 배포](docs/CLOUDFLARE_DEPLOYMENT.md) · [그림 에셋·등록](docs/GAME_ASSETS.md) · [모바일 앱(Android·iOS)](docs/MOBILE_APPS.md) · [Android 빌드 환경](docs/android-build-environment.md)
 - 품질: [테스트 계획](docs/TEST_PLAN.md) · [테스트 구조](docs/TEST_STRUCTURE.md) · [구현 백로그](docs/IMPLEMENTATION_BACKLOG.md)
 - 문서 운영: [문서 운영 기준](docs/DOCUMENTATION.md)
 
@@ -70,12 +71,20 @@ PostgreSQL 없이 실행하면 메모리 저장소를 쓴다. 개발 서버 환�
 
 ### 앱인토스 테스트
 
-SDK 3.x 기능은 `pnpm dev`로 띄운 브라우저의 AIT Devtools로 확인한다. 실제 토스 환경용 번들은 운영 Worker 주소를 넣어 만든다.
+SDK 3.x 기능은 `pnpm dev`로 띄운 브라우저의 AIT Devtools로 확인한다. 실제 토스 환경용 번들은 운영 Worker에 연결되게 만든다. 서버 주소는 `scripts/production.config.json`에서 읽는다(`VITE_SERVER_URL`로 바꿀 수 있음).
 
 ```powershell
-$env:VITE_SERVER_URL="https://<운영 game Worker 주소>"
 pnpm build:ait:cloudflare
 ```
+
+### 모바일 앱
+
+```powershell
+pnpm build:android   # Android 앱에 웹 번들 넣기 → apps/android 에서 ./gradlew :app:assembleDebug
+pnpm build:ios       # iOS 앱에 웹 번들 넣기 → Mac의 Xcode에서 실행·배포
+```
+
+자세한 내용은 [모바일 앱](docs/MOBILE_APPS.md)을 본다.
 
 > `pnpm build:ait`(Cloudflare 없이)는 로컬 Node 서버(Socket.IO)에 연결하는 번들을 만든다. 토스에 올리는 번들은 `build:ait:cloudflare`를 쓴다.
 
