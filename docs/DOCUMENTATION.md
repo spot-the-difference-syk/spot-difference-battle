@@ -33,6 +33,7 @@
 | `TECH_SPEC.md` | 운영 구조·통신·카탈로그 기술 계약 |
 | `DATABASE_DESIGN.md` | Supabase 테이블과 관계 |
 | `CLOUDFLARE_DEPLOYMENT.md` | 운영 배포·Supabase 연결·복구 |
+| `MONETIZATION.md` | 명작 컬렉션과 현금 결제 계획 |
 | `GAME_ASSETS.md` | 그림 품질 기준과 R2·카탈로그 등록 절차 |
 | `design/SOLO_ASSET_PROVENANCE.md` | 솔로 그림 생성 기록 |
 | `MOBILE_APPS.md` | Android·iOS 앱 구조, 서버 주소, 빌드·배포 |

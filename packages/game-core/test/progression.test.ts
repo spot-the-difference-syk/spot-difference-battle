@@ -128,10 +128,18 @@ describe("player growth", () => {
   it("spreads many items over levels 1 to 50 with prices that rise with level", () => {
     expect(new Set(COSMETIC_ITEMS.map((item) => item.id)).size).toBe(COSMETIC_ITEMS.length);
     for (const slot of COSMETIC_SLOTS) expect(COSMETIC_ITEMS.filter((item) => item.slot === slot).length, slot).toBeGreaterThanOrEqual(15);
+    expect(COSMETIC_ITEMS.filter((item) => item.premium).length).toBeGreaterThanOrEqual(15);
     for (const item of COSMETIC_ITEMS) {
       expect(item.minLevel, item.id).toBeGreaterThanOrEqual(1);
       expect(item.minLevel, item.id).toBeLessThanOrEqual(PROGRESSION_RULES.maxLevel);
       if (item.price === 0) continue;
+      if (item.premium) {
+        // 명작 컬렉션은 레벨 제한 없이 코인으로 산다.
+        expect(item.minLevel, item.id).toBe(1);
+        expect(item.price, item.id).toBeGreaterThanOrEqual(5_000);
+        expect(item.price, item.id).toBeLessThanOrEqual(20_000);
+        continue;
+      }
       // 레벨 1~9는 400~2,600, 이후 구간마다 비싸지고 최고 15,000코인
       expect(item.price, item.id).toBeGreaterThanOrEqual(item.minLevel >= 30 ? 6_500 : item.minLevel >= 20 ? 4_000 : item.minLevel >= 10 ? 2_000 : 400);
       expect(item.price, item.id).toBeLessThanOrEqual(item.minLevel >= 40 ? 15_000 : item.minLevel >= 30 ? 10_000 : item.minLevel >= 20 ? 7_500 : item.minLevel >= 10 ? 4_500 : 3_000);
@@ -140,6 +148,14 @@ describe("player growth", () => {
     for (let level = 5; level <= PROGRESSION_RULES.maxLevel; level += 5) {
       expect(COSMETIC_ITEMS.some((item) => item.minLevel === level && item.price === 0 && !item.rewardOnly), `level ${level}`).toBe(true);
     }
+  });
+
+  it("sells premium items for coins at any level, but never reward-only items", () => {
+    const rich = { ...emptyGrowth(), coins: 20_000 };
+    const bought = buyCosmetic(rich, 1, "avatar-starry");
+    expect(bought).toMatchObject({ ok: true, growth: { coins: 11_000, loadout: { avatar: "avatar-starry" } } });
+    expect(buyCosmetic({ ...emptyGrowth(), coins: 100 }, 1, "frame-masterpiece")).toMatchObject({ ok: false, code: "NOT_ENOUGH_COINS" });
+    expect(COSMETIC_ITEMS.some((item) => item.premium && item.rewardOnly)).toBe(false);
   });
 
   it("stops at the maximum level and keeps counting experience", () => {

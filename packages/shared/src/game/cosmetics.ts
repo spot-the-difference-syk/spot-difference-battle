@@ -15,6 +15,11 @@ export interface CosmeticItem {
   minLevel: number;
   /** 랭킹 보상으로만 받을 수 있다(살 수 없다). */
   rewardOnly?: boolean;
+  /**
+   * 명작 컬렉션: 움직이는 고급 아이템. 레벨 제한 없이 코인으로 산다.
+   * 나중에 현금 결제를 붙일 때 이 표시로 상품을 묶는다(docs/MONETIZATION.md).
+   */
+  premium?: boolean;
 }
 
 export type CosmeticLoadout = Record<CosmeticSlot, string>;
@@ -28,6 +33,8 @@ export interface PublicCosmetics {
 
 const item = (slot: CosmeticSlot, id: string, name: string, description: string, price: number, minLevel = 1): CosmeticItem =>
   ({ id, slot, name, description, price, minLevel });
+const premium = (slot: CosmeticSlot, id: string, name: string, description: string, price: number): CosmeticItem =>
+  ({ id, slot, name, description, price, minLevel: 1, premium: true });
 const reward = (slot: CosmeticSlot, id: string, name: string, description: string): CosmeticItem =>
   ({ id, slot, name, description, price: 0, minLevel: 1, rewardOnly: true });
 
@@ -55,6 +62,9 @@ export const COSMETIC_ITEMS: readonly CosmeticItem[] = [
   item("marker", "marker-rainbow", "무지개 고리", "일곱 빛깔로 도는 고리", 6500, 28),
   item("marker", "marker-comet", "혜성", "꼬리를 단 빛나는 혜성", 8500, 36),
   item("marker", "marker-diamond", "다이아몬드 컷", "보석처럼 깎인 표시", 12000, 45),
+  premium("marker", "marker-sparkle", "반짝이 가루", "작은 별들이 반짝이며 맴돌아요", 5000),
+  premium("marker", "marker-butterfly", "나비", "찾은 곳에 나비가 날개짓해요", 7000),
+  premium("marker", "marker-firework", "불꽃놀이", "찾을 때마다 불꽃이 터져요", 9000),
 
   // 액자: 내 화면의 그림 두 장을 감싸는 테두리
   item("frame", "frame-none", "액자 없음", "그림만 깔끔하게", 0),
@@ -74,6 +84,9 @@ export const COSMETIC_ITEMS: readonly CosmeticItem[] = [
   item("frame", "frame-neon", "네온 사인", "밤거리의 네온 불빛", 7500, 30),
   item("frame", "frame-baroque", "바로크 금장", "겹겹이 새긴 금장 액자", 10000, 38),
   item("frame", "frame-aurora", "오로라", "북극의 빛이 일렁이는 테", 15000, 48),
+  premium("frame", "frame-sakura", "벚꽃 액자", "꽃잎이 흩날리는 분홍 액자", 9000),
+  premium("frame", "frame-starry", "별밤 액자", "소용돌이치는 별밤이 흐르는 액자", 12000),
+  premium("frame", "frame-masterpiece", "명작 금장", "미술관 명작에 두르는 조각 금장", 16000),
 
   // 프로필 그림: 상대에게도 보인다. 그림은 apps/web/src/assets/avatars/<ID>.svg
   item("avatar", "avatar-initial", "첫 글자", "닉네임 첫 글자를 보여줘요", 0),
@@ -102,6 +115,12 @@ export const COSMETIC_ITEMS: readonly CosmeticItem[] = [
   item("avatar", "avatar-phoenix", "불사조", "불꽃 날개의 불사조", 9000, 37),
   item("avatar", "avatar-gem", "보석", "빛을 머금은 푸른 보석", 12000, 43),
   item("avatar", "avatar-laurel", "월계관", "최고 레벨 감정사의 월계관", 0, 50),
+  premium("avatar", "avatar-sunflower", "해바라기", "바람에 흔들리는 해바라기", 6000),
+  premium("avatar", "avatar-sakuracat", "벚꽃 고양이", "꽃잎이 흩날리는 봄날의 고양이", 7000),
+  premium("avatar", "avatar-koi", "연못의 비단잉어", "물결 위를 맴도는 비단잉어 한 쌍", 8000),
+  premium("avatar", "avatar-wave", "큰 파도", "붉은 해 아래 굽이치는 파도", 8000),
+  premium("avatar", "avatar-starry", "별이 빛나는 밤", "소용돌이 하늘에 별이 반짝여요", 9000),
+  premium("avatar", "avatar-galaxywhale", "은하 고래", "별바다를 헤엄치는 고래", 10000),
 
   // 프로필 테두리: 상대에게도 보인다.
   item("profile", "profile-none", "기본 테두리", "레벨 링만 보여요", 0),
@@ -122,6 +141,9 @@ export const COSMETIC_ITEMS: readonly CosmeticItem[] = [
   item("profile", "profile-ruby", "루비", "깊은 붉은 보석 테두리", 8500, 34),
   item("profile", "profile-diamond", "다이아몬드", "눈부신 보석 테두리", 12000, 42),
   item("profile", "profile-legend", "전설의 금테", "레벨 50에 받는 금테", 0, 50),
+  premium("profile", "profile-orbit", "별 궤도", "작은 별이 프로필을 돌아요", 8000),
+  premium("profile", "profile-flame", "불꽃", "일렁이는 불꽃 테두리", 10000),
+  premium("profile", "profile-galaxy", "은하수", "별가루가 흐르는 은하수 고리", 12000),
 
   // 칭호: 상대에게도 보인다. 5레벨마다 무료 칭호
   item("title", "title-visitor", "새내기 관람객", "처음 전시를 찾은 관람객", 0),
