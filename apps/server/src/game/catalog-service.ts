@@ -1,18 +1,21 @@
 import type { MatchPuzzle } from "@spot-battle/game-core";
 import { GAME_CONFIG, bundledPuzzleCards, puzzleObjectKey, type PuzzleCard } from "@spot-battle/shared";
 import { GAME_PUZZLES } from "./puzzle-catalog.js";
+import { BUNDLED_SOLO_ANSWERS, type SoloPuzzle } from "./solo-puzzles.js";
 
-/** 대결 문제(정답 포함, 서버 전용)와 브라우저에 공개하는 카드 */
+/** 대결·솔로 문제(정답 포함, 서버 전용)와 브라우저에 공개하는 카드 */
 export interface LoadedCatalog {
   battle: MatchPuzzle[];
+  solo: SoloPuzzle[];
   cards: PuzzleCard[];
 }
 
-export function codeCatalog(puzzles: readonly MatchPuzzle[] = GAME_PUZZLES): LoadedCatalog {
+export function codeCatalog(puzzles: readonly MatchPuzzle[] = GAME_PUZZLES, solo: readonly SoloPuzzle[] = BUNDLED_SOLO_ANSWERS): LoadedCatalog {
   const cards = bundledPuzzleCards();
   const battleIds = new Set(puzzles.map((puzzle) => puzzle.id));
   return {
     battle: structuredClone([...puzzles]) as MatchPuzzle[],
+    solo: structuredClone([...solo]),
     // 주입된 테스트 카탈로그에 없는 대결 그림은 공개 목록에서도 뺀다.
     cards: cards.filter((card) => card.mode === "solo" || battleIds.has(card.id)),
   };
@@ -31,6 +34,8 @@ export class CatalogService {
   private pending: Promise<void> | null = null;
   /** 경기 도중 카탈로그가 바뀌어도 진행 중인 그림 정보를 내려줄 수 있게 본 카드를 기억한다. */
   private readonly seenCards = new Map<string, PuzzleCard>();
+  /** 솔로 판 도중 카탈로그가 바뀌어도 그 판의 정답으로 판정할 수 있게 기억한다. */
+  private readonly seenSolo = new Map<string, SoloPuzzle>();
 
   constructor(
     initial: LoadedCatalog,
@@ -48,6 +53,7 @@ export class CatalogService {
 
   private remember(catalog: LoadedCatalog): void {
     for (const card of catalog.cards) this.seenCards.set(`${card.id}@${card.version}`, card);
+    for (const puzzle of catalog.solo) this.seenSolo.set(`${puzzle.id}@${puzzle.version}`, puzzle);
   }
 
   /** 오래된 카탈로그면 다시 읽은 뒤 돌려준다. */
@@ -86,8 +92,14 @@ export class CatalogService {
       .map(({ puzzle }) => structuredClone(puzzle));
   }
 
-  isSoloPuzzle(id: string): boolean {
-    return this.current.cards.some((card) => card.mode === "solo" && card.id === id);
+  /** 지금 활성인 솔로 그림 */
+  soloPuzzle(id: string): SoloPuzzle | undefined {
+    return this.current.solo.find((puzzle) => puzzle.id === id);
+  }
+
+  /** 진행 중인 솔로 판의 정답(그 판을 시작한 버전) */
+  soloAnswers(id: string, version: string): SoloPuzzle | undefined {
+    return this.seenSolo.get(`${id}@${version}`);
   }
 
   /** 경기 그림들의 공개 카드. 카탈로그에서 빠진 그림도 R2 주소 규칙으로 복원한다. */

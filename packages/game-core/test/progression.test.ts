@@ -90,7 +90,7 @@ describe("player growth", () => {
   it("repairs corrupted stored values", () => {
     expect(normalizeGrowth({ totalXp: -5, coins: "x", rewardedMatchIds: [1, "m"] })).toEqual({
       totalXp: 0, coins: 0, rewardedMatchIds: ["m"], soloRewardDay: null, soloRewardCount: 0,
-      ownedItems: [], loadout: DEFAULT_LOADOUT,
+      ownedItems: [], loadout: DEFAULT_LOADOUT, soloBests: {}, rankingRewardWeeks: [],
       stats: { matches: 0, wins: 0, draws: 0, losses: 0, soloClears: 0, differencesFound: 0 }, collected: [], daily: null,
     });
     expect(normalizeGrowth({ ownedItems: ["frame-wood", "nope"], loadout: { frame: "marker-ring", title: "title-detective" } })).toMatchObject({
@@ -112,7 +112,7 @@ describe("player growth", () => {
     expect(equipCosmetic(rich, 1, "title-detective")).toMatchObject({ ok: false, code: "ITEM_NOT_OWNED" });
     expect(equipCosmetic(rich, 4, "title-eye")).toMatchObject({ ok: false, code: "ITEM_LOCKED" });
     expect(equipCosmetic(rich, 5, "title-eye")).toMatchObject({ ok: true, growth: { loadout: { title: "title-eye" } } });
-    expect(growthView({ ...rich, totalXp: 0 }).ownedItemIds).toEqual(COSMETIC_ITEMS.filter((item) => item.price === 0 && item.minLevel === 1).map((item) => item.id));
+    expect(growthView({ ...rich, totalXp: 0 }).ownedItemIds).toEqual(COSMETIC_ITEMS.filter((item) => item.price === 0 && item.minLevel === 1 && !item.rewardOnly).map((item) => item.id));
   });
 
   it("sells profile images for coins, shows them to the opponent and keeps old saves on the initial", () => {

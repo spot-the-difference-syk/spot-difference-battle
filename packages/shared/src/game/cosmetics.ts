@@ -13,6 +13,8 @@ export interface CosmeticItem {
   price: number;
   /** 이 레벨부터 구매·사용할 수 있다. */
   minLevel: number;
+  /** 랭킹 보상으로만 받을 수 있다(살 수 없다). */
+  rewardOnly?: boolean;
 }
 
 export type CosmeticLoadout = Record<CosmeticSlot, string>;
@@ -26,6 +28,8 @@ export interface PublicCosmetics {
 
 const item = (slot: CosmeticSlot, id: string, name: string, description: string, price: number, minLevel = 1): CosmeticItem =>
   ({ id, slot, name, description, price, minLevel });
+const reward = (slot: CosmeticSlot, id: string, name: string, description: string): CosmeticItem =>
+  ({ id, slot, name, description, price: 0, minLevel: 1, rewardOnly: true });
 
 /** 아이템 목록의 정본. 새 아이템은 여기에 추가하고 웹 스타일을 함께 만든다. */
 export const COSMETIC_ITEMS: readonly CosmeticItem[] = [
@@ -60,6 +64,8 @@ export const COSMETIC_ITEMS: readonly CosmeticItem[] = [
   item("title", "title-eye", "눈썰미 장인", "레벨 5에 받는 칭호", 0, 5),
   item("title", "title-detective", "숨은그림 탐정", "작은 차이도 놓치지 않아요", 1000),
   item("title", "title-curator", "갤러리 큐레이터", "레벨 10 이상만 쓸 수 있어요", 3000, 10),
+  reward("title", "title-weekly-top", "주간 상위권", "솔로 주간 랭킹 상위 10% 이상에게 주는 칭호"),
+  reward("title", "title-weekly-champion", "주간 챔피언", "솔로 주간 랭킹 1위에게 주는 칭호"),
 ];
 
 export const COSMETIC_ITEM_BY_ID: Readonly<Record<string, CosmeticItem>> = Object.fromEntries(COSMETIC_ITEMS.map((entry) => [entry.id, entry]));
@@ -86,8 +92,9 @@ export function normalizeOwnedItems(value: unknown): string[] {
   return Array.isArray(value) ? [...new Set(value.filter((id): id is string => typeof id === "string" && Boolean(COSMETIC_ITEM_BY_ID[id])))] : [];
 }
 
-/** 무료 아이템은 레벨만 되면, 유료 아이템은 구매해야 보유한다. */
+/** 무료 아이템은 레벨만 되면, 유료·랭킹 보상 아이템은 받아야 보유한다. */
 export function ownsItem(growth: Pick<PlayerGrowth, "ownedItems">, level: number, entry: CosmeticItem): boolean {
+  if (entry.rewardOnly) return growth.ownedItems.includes(entry.id);
   if (level < entry.minLevel) return false;
   return entry.price === 0 || growth.ownedItems.includes(entry.id);
 }
@@ -102,14 +109,15 @@ export function publicCosmetics(loadout: CosmeticLoadout): PublicCosmetics {
 
 export type CosmeticResult =
   | { ok: true; growth: PlayerGrowth }
-  | { ok: false; code: "ITEM_NOT_FOUND" | "ITEM_LOCKED" | "ITEM_OWNED" | "NOT_ENOUGH_COINS" | "ITEM_NOT_OWNED"; message: string };
+  | { ok: false; code: "ITEM_NOT_FOUND" | "ITEM_LOCKED" | "ITEM_OWNED" | "NOT_ENOUGH_COINS" | "ITEM_NOT_OWNED" | "ITEM_REWARD_ONLY"; message: string };
 
 /** 코인으로 아이템을 사고 바로 착용한다. */
 export function buyCosmetic(growth: PlayerGrowth, level: number, itemId: string): CosmeticResult {
   const entry = COSMETIC_ITEM_BY_ID[itemId];
   if (!entry) return { ok: false, code: "ITEM_NOT_FOUND", message: "없는 아이템이에요." };
-  if (level < entry.minLevel) return { ok: false, code: "ITEM_LOCKED", message: `레벨 ${entry.minLevel}부터 쓸 수 있어요.` };
   if (ownsItem(growth, level, entry)) return { ok: false, code: "ITEM_OWNED", message: "이미 가지고 있어요." };
+  if (entry.rewardOnly) return { ok: false, code: "ITEM_REWARD_ONLY", message: "솔로 주간 랭킹 보상으로만 받을 수 있어요." };
+  if (level < entry.minLevel) return { ok: false, code: "ITEM_LOCKED", message: `레벨 ${entry.minLevel}부터 쓸 수 있어요.` };
   if (growth.coins < entry.price) return { ok: false, code: "NOT_ENOUGH_COINS", message: "코인이 부족해요." };
   return {
     ok: true,
@@ -126,6 +134,7 @@ export function equipCosmetic(growth: PlayerGrowth, level: number, itemId: strin
   const entry = COSMETIC_ITEM_BY_ID[itemId];
   if (!entry) return { ok: false, code: "ITEM_NOT_FOUND", message: "없는 아이템이에요." };
   if (!ownsItem(growth, level, entry)) {
+    if (entry.rewardOnly) return { ok: false, code: "ITEM_REWARD_ONLY", message: "솔로 주간 랭킹 보상으로만 받을 수 있어요." };
     return level < entry.minLevel
       ? { ok: false, code: "ITEM_LOCKED", message: `레벨 ${entry.minLevel}부터 쓸 수 있어요.` }
       : { ok: false, code: "ITEM_NOT_OWNED", message: "먼저 구매해주세요." };

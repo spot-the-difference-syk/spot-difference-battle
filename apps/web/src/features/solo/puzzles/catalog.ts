@@ -1,4 +1,3 @@
-import type { SoloDifference } from "../model/solo-engine";
 import alpineStationModified from "@/assets/puzzles/solo/alpine-station-modified.webp";
 import alpineStationOriginal from "@/assets/puzzles/solo/alpine-station-original.webp";
 import bakeryModified from "@/assets/puzzles/solo/bakery-modified.webp";
@@ -22,7 +21,6 @@ export interface SoloPuzzle {
   alt: string;
   originalSrc: string;
   modifiedSrc: string;
-  differences: readonly SoloDifference[];
 }
 
 const IMAGES: Readonly<Record<SoloPuzzleId, { originalSrc: string; modifiedSrc: string }>> = {
@@ -33,14 +31,13 @@ const IMAGES: Readonly<Record<SoloPuzzleId, { originalSrc: string; modifiedSrc: 
   clockmaker: { originalSrc: clockmakerOriginal, modifiedSrc: clockmakerModified },
 };
 
-/** 앱 번들에 포함된 솔로 그림. 제목·정답은 공용 패키지(BUNDLED_SOLO_PUZZLES)가 정본이다. */
+/** 앱 번들에 포함된 솔로 그림. 제목은 공용 패키지(BUNDLED_SOLO_PUZZLES)가 정본이고, 정답은 서버에만 있다. */
 export const SOLO_PUZZLES: readonly SoloPuzzle[] = BUNDLED_SOLO_PUZZLES.map((puzzle) => ({
   id: puzzle.id,
   metadata: SOLO_ASSET_MANIFEST[puzzle.id],
   label: puzzle.title,
   alt: puzzle.alt,
   ...IMAGES[puzzle.id],
-  differences: puzzle.answers,
 }));
 
 export const SOLO_PUZZLE_BY_ID = Object.fromEntries(

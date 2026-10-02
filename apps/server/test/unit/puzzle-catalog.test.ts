@@ -44,17 +44,20 @@ describe("database puzzle contract", () => {
     expect(JSON.stringify(parsed.cards)).not.toContain("regions");
   });
 
-  it("accepts brand-new puzzles without code changes and exposes solo answers", () => {
+  it("accepts brand-new puzzles without code changes and keeps solo answers on the server", () => {
     const parsed = parseCatalog([
       row(),
       row({ pair_id: "night-market", asset_version: "2026-10-02.1", metadata: { genre: "애니" } }),
       row({ pair_id: "tea-house", asset_version: "2026-10-02.1", differences: soloDifferences, metadata: { mode: "solo", genre: "회화" } }),
     ]);
     expect(parsed.battle.map((puzzle) => puzzle.id)).toEqual(["home-office", "night-market"]);
-    const solo = parsed.cards.find((card) => card.id === "tea-house")!;
-    expect(solo.mode).toBe("solo");
+    expect(parsed.cards.find((card) => card.id === "tea-house")!.mode).toBe("solo");
+    // 솔로 정답은 서버만 가진다. 카드에는 싣지 않는다.
+    expect(JSON.stringify(parsed.cards)).not.toContain('"answers"');
+    const solo = parsed.solo.find((puzzle) => puzzle.id === "tea-house")!;
+    expect(solo.version).toBe("2026-10-02.1");
     expect(solo.answers).toHaveLength(5);
-    expect(solo.answers![0]).toMatchObject({ id: "d0", region: { x: 0.1 }, extraRegions: [{ x: 0.2 }] });
+    expect(solo.answers[0]).toMatchObject({ id: "d0", region: { x: 0.1 }, extraRegions: [{ x: 0.2 }] });
   });
 
   it("rejects empty, duplicate and invalid rows", () => {
@@ -131,11 +134,14 @@ describe("catalog service", () => {
     expect(new Set(deck.map((puzzle) => puzzle.id)).size).toBe(10);
   });
 
-  it("serves bundled cards with no answers for battle puzzles in code mode", () => {
+  it("serves bundled cards without answers and keeps solo answers on the server", () => {
     const service = new CatalogService(codeCatalog());
     expect(service.cards.filter((card) => card.mode === "battle")).toHaveLength(GAME_PUZZLES.length);
-    expect(service.cards.filter((card) => card.mode === "battle").every((card) => card.answers === undefined)).toBe(true);
-    expect(service.isSoloPuzzle("observatory")).toBe(true);
-    expect(service.isSoloPuzzle("cozy-cafe")).toBe(false);
+    expect(JSON.stringify(service.cards)).not.toContain('"answers"');
+    expect(service.soloPuzzle("observatory")).toMatchObject({ id: "observatory" });
+    expect(service.soloPuzzle("cozy-cafe")).toBeUndefined();
+    const solo = service.soloPuzzle("observatory")!;
+    expect(service.soloAnswers("observatory", solo.version)?.answers).toHaveLength(5);
+    expect(service.soloAnswers("observatory", "old-version")).toBeUndefined();
   });
 });

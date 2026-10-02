@@ -1,7 +1,8 @@
 import { GameMatch, GameRuleError, type MatchPuzzle, type PersistedMatchState } from "@spot-battle/game-core";
-import { DEFAULT_MATCH_SETTINGS, GAME_CONFIG, GAME_DIFFICULTIES, GAME_MODES, buyCosmetic, emptyGrowth, equipCosmetic, grantSoloReward, growthView, matchJourney, settleMatch, normalizeGrowth, publicCosmetics, type MatchSettings, type PlayerGrowth, type PlayerGrowthPayload } from "@spot-battle/shared";
+import { DEFAULT_MATCH_SETTINGS, GAME_CONFIG, GAME_DIFFICULTIES, GAME_MODES, buyCosmetic, emptyGrowth, equipCosmetic, grantRankingReward, grantSoloReward, growthView, matchJourney, settleMatch, normalizeGrowth, publicCosmetics, type MatchSettings, type PlayerGrowth, type PlayerGrowthPayload, type PublicCosmetics, type RankEntry, type SoloRun, type WeeklyRewardGrant } from "@spot-battle/shared";
 import { GAME_PUZZLES } from "../../../apps/server/src/game/puzzle-catalog.js";
 import { CatalogService, codeCatalog } from "../../../apps/server/src/game/catalog-service.js";
+import { SoloLeague, emptyLeagueState, type LeagueState } from "../../../apps/server/src/game/solo-league.js";
 
 export interface Storage {
   get<T>(key: string): Promise<T | undefined>;
@@ -25,6 +26,8 @@ interface Session {
   growthRev?: number;
   /** Supabase에 저장을 마친 growthRev */
   growthSavedRev?: number;
+  /** 진행 중인 솔로 판(서버 판정) */
+  soloRun?: SoloRun;
 }
 interface StoredMatch { state: PersistedMatchState; finishedAt: number | null; archived: boolean; retiredPlayers?: string[] }
 interface LiveMatch { match: GameMatch; finishedAt: number | null; archived: boolean; retiredPlayers?: string[] }
@@ -87,6 +90,7 @@ export class RealtimeGame {
   /** 다음 성장 기록 백업 시각. 백업할 것이 없으면 null */
   private growthDueAt: number | null = null;
   private readonly catalog: CatalogService;
+  private league!: SoloLeague;
 
   constructor(
     private storage: Storage,
@@ -96,6 +100,7 @@ export class RealtimeGame {
     private now: () => number = Date.now,
   ) {
     this.catalog = catalog instanceof CatalogService ? catalog : new CatalogService(codeCatalog(catalog));
+    this.league = new SoloLeague(this.catalog, emptyLeagueState(), this.now);
   }
 
   /** 브라우저에 공개하는 활성 퍼즐 목록(대결 정답 제외) */
@@ -109,6 +114,10 @@ export class RealtimeGame {
 
   async restore(): Promise<void> {
     this.sessions = new Map([...await this.storage.list<Session>({ prefix: "session:" })].map(([, s]) => [s.playerId, s]));
+    // 솔로 랭킹: 순위표는 키마다, 정산 상태는 한 키에 둔다.
+    const league: LeagueState = { ...emptyLeagueState(), ...await this.storage.get<Omit<LeagueState, "boards">>("league:meta") };
+    for (const [key, board] of await this.storage.list<RankEntry[]>({ prefix: "league:board:" })) league.boards[key.slice("league:board:".length)] = board;
+    this.league = new SoloLeague(this.catalog, league, this.now);
     for (const [, saved] of await this.storage.list<StoredMatch>({ prefix: "match:" })) {
       this.matches.set(saved.state.matchId, { match: GameMatch.restore(saved.state), finishedAt: saved.finishedAt, archived: saved.archived, retiredPlayers: saved.retiredPlayers });
     }
@@ -193,6 +202,8 @@ export class RealtimeGame {
     active.lastSeenAt = this.now();
     this.emit(peer, "session:ready", { playerId: active.playerId, guestToken: active.guestToken });
     this.emit(peer, "player:growth", this.growthPayload(active));
+    this.settleRanking();
+    this.giveRankingRewards(active, this.league.takePending(active.playerId));
     await this.advance();
     active.reconnectAt = null;
     // A finished match the player has not dismissed is shown again (e.g. forfeited while offline).
@@ -234,16 +245,52 @@ export class RealtimeGame {
         if (!result.ok) throw new GameRuleError(result.code, result.message);
         this.setGrowth(session, result.growth);
         this.emit(peer, "player:growth", this.growthPayload(session));
-      } else if (event === "solo:complete") {
+      } else if (event === "solo:start") {
         const input = object(payload);
-        if (typeof input.puzzleId !== "string" || typeof input.elapsedMs !== "number") throw new GameRuleError("INVALID_PAYLOAD", "솔로 기록 형식이 올바르지 않습니다.");
-        const before = this.growthOf(session);
-        const soloId = this.catalog.isSoloPuzzle(input.puzzleId) ? input.puzzleId : undefined;
-        const result = grantSoloReward(before, input.elapsedMs, this.now(), soloId);
-        if (result.progress !== before) this.setGrowth(session, result.progress);
-        this.emit(peer, "player:growth", this.growthPayload(session, {
-          ...(result.reward ? { reward: result.reward } : {}),
-          ...(result.limitReached ? { soloLimitReached: true } : {}),
+        const nickname = string(input, "nickname").trim().slice(0, 16);
+        if (nickname.length < 2) throw new GameRuleError("INVALID_NICKNAME", "닉네임은 2자 이상이어야 합니다.");
+        await this.catalog.fresh();
+        session.nickname = nickname;
+        this.settleRanking();
+        const started = this.league.start(string(input, "puzzleId"), crypto.randomUUID());
+        session.soloRun = started.run;
+        this.emit(peer, "solo:started", started.payload);
+      } else if (event === "solo:guess") {
+        const input = object(payload);
+        const guessed = this.league.guess(session.soloRun, string(input, "runId"), {
+          point: object(input.point) as never,
+          pointerType: typeof input.pointerType === "string" ? input.pointerType : undefined,
+          boardSizePx: typeof input.boardSizePx === "number" ? input.boardSizePx : undefined,
+        });
+        if (!guessed.finish) {
+          session.soloRun = guessed.run;
+          this.emit(peer, "solo:guess-result", guessed.payload);
+        } else {
+          delete session.soloRun;
+          const { puzzleId, elapsedMs } = guessed.finish;
+          const before = this.growthOf(session);
+          const result = grantSoloReward(before, elapsedMs, this.now(), puzzleId);
+          if (result.progress !== before) this.setGrowth(session, result.progress);
+          const ranks = this.league.record({ playerId: session.playerId, nickname: session.nickname ?? "손님", ...publicCosmetics(result.progress.loadout) }, guessed.finish);
+          this.emit(peer, "solo:guess-result", {
+            ...guessed.payload,
+            finished: { elapsedMs, personalBestMs: result.progress.soloBests[puzzleId] ?? elapsedMs, newPersonalBest: result.progress.soloBests[puzzleId] !== before.soloBests[puzzleId], ...ranks },
+          });
+          this.emit(peer, "player:growth", this.growthPayload(session, {
+            ...(result.reward ? { reward: result.reward } : {}),
+            ...(result.limitReached ? { soloLimitReached: true } : {}),
+          }));
+        }
+      } else if (event === "ranking:get") {
+        const input = object(payload);
+        const period = string(input, "period");
+        if (period !== "week" && period !== "all") throw new GameRuleError("INVALID_PAYLOAD", "랭킹 기간이 올바르지 않습니다.");
+        const puzzleId = string(input, "puzzleId");
+        this.settleRanking();
+        this.emit(peer, "ranking:list", this.league.ranking(puzzleId, period, {
+          playerId: session.playerId,
+          personalBestMs: this.growthOf(session).soloBests[puzzleId] ?? null,
+          cosmetics: this.knownCosmetics(),
         }));
       } else {
         const input = object(payload);
@@ -420,6 +467,32 @@ export class RealtimeGame {
     return session.nickname === null ? ANONYMOUS_SESSION_RETENTION : SESSION_RETENTION;
   }
 
+  /** 지난주 솔로 랭킹 보상을 한 번만 나눠 준다. 세션이 없는 플레이어는 다음 접속 때 준다. */
+  private settleRanking(): void {
+    for (const grant of this.league.settle()) {
+      const session = this.sessions.get(grant.playerId);
+      if (session) this.giveRankingRewards(session, [grant]);
+      else this.league.hold(grant);
+    }
+  }
+
+  private giveRankingRewards(session: Session, grants: WeeklyRewardGrant[]): void {
+    for (const grant of grants) {
+      const granted = grantRankingReward(this.growthOf(session), grant, this.now());
+      if (!granted) continue;
+      this.setGrowth(session, granted.progress);
+      const payload = this.growthPayload(session, { reward: granted.reward });
+      for (const peer of this.peers()) if (peer.playerId === session.playerId) this.emit(peer, "player:growth", payload);
+    }
+  }
+
+  /** 순위표에 최신 꾸미기를 보여주기 위해, 세션이 남아 있는 플레이어의 꾸미기 */
+  private knownCosmetics(): Map<string, PublicCosmetics> {
+    const map = new Map<string, PublicCosmetics>();
+    for (const session of this.sessions.values()) if (session.growth) map.set(session.playerId, publicCosmetics(this.growthOf(session).loadout));
+    return map;
+  }
+
   private setGrowth(session: Session, growth: PlayerGrowth): void {
     session.growth = growth;
     session.growthRev = (session.growthRev ?? 0) + 1;
@@ -502,6 +575,12 @@ export class RealtimeGame {
 
   private async persistCheckpoint(storage: Storage): Promise<void> {
     const now = this.now();
+    const league = this.league.drainChanges();
+    for (const [key, board] of league.boards) {
+      if (board) await storage.put(`league:board:${key}`, board);
+      else await storage.delete(`league:board:${key}`);
+    }
+    if (league.meta) await storage.put("league:meta", { settledWeek: this.league.state.settledWeek, pending: this.league.state.pending });
     for (const [id, live] of this.matches) {
       if (terminal(live.match)) live.finishedAt ??= now;
       if (live.finishedAt !== null && live.archived && (live.retiredPlayers?.length === 2 || now >= live.finishedAt + RETENTION)) {

@@ -5,7 +5,6 @@ import {
   type CatalogPayload,
   type PuzzleCard,
   type PuzzleMode,
-  type SoloAnswer,
 } from "@spot-battle/shared";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { gameServerUrl } from "../../config/endpoints";
@@ -24,7 +23,6 @@ export interface PuzzleVisual {
   key: string;
   originalSrc: string;
   modifiedSrc: string;
-  answers?: readonly SoloAnswer[];
 }
 
 /** 앱 번들에 들어 있는 이미지. 서버가 URL을 주지 않으면 여기서 찾는다. */
@@ -39,7 +37,6 @@ export function toVisual(card: PuzzleCard): PuzzleVisual | null {
   const originalSrc = card.originalUrl ?? bundled?.originalSrc;
   const modifiedSrc = card.modifiedUrl ?? bundled?.modifiedSrc;
   if (!originalSrc || !modifiedSrc) return null;
-  if (card.mode === "solo" && !card.answers?.length) return null;
   return {
     id: card.id,
     version: card.version,
@@ -50,7 +47,6 @@ export function toVisual(card: PuzzleCard): PuzzleVisual | null {
     key,
     originalSrc,
     modifiedSrc,
-    ...(card.answers ? { answers: card.answers } : {}),
   };
 }
 

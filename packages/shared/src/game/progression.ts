@@ -1,5 +1,6 @@
 import { DEFAULT_LOADOUT, normalizeLoadout, normalizeOwnedItems, ownedItemIds, type CosmeticLoadout } from "./cosmetics.js";
 import type { GameSnapshot } from "./types.js";
+import type { WeeklyRewardGrant } from "./leaderboard.js";
 
 export interface PlayerStats {
   /** 끝까지 진행된 대결 수(기권 포함) */
@@ -36,6 +37,10 @@ export interface PlayerGrowth {
   /** 끝까지 푼 그림. "game:<id>" 또는 "solo:<id>" */
   collected: string[];
   daily: DailyGoalRecord | null;
+  /** 솔로 그림별 개인 최고 기록(ms). 서버가 잰 기록만 들어간다. */
+  soloBests: Record<string, number>;
+  /** 이미 받은 솔로 주간 랭킹 보상의 주(YYYY-MM-DD). 같은 주를 두 번 받지 않는다. */
+  rankingRewardWeeks: string[];
 }
 
 export interface DailyGoalView {
@@ -62,9 +67,10 @@ export interface GrowthView {
   stats: PlayerStats;
   collected: string[];
   daily: DailyGoalView;
+  soloBests: Record<string, number>;
 }
 
-export type RewardReason = "WIN" | "LOSS" | "DRAW" | "SOLO";
+export type RewardReason = "WIN" | "LOSS" | "DRAW" | "SOLO" | "RANKING";
 
 export interface RewardSummary {
   reason: RewardReason;
@@ -78,6 +84,8 @@ export interface RewardSummary {
   dailyGoal?: { label: string; xp: number; coins: number };
   /** 이번에 처음 수집한 그림 */
   newlyCollected?: string[];
+  /** 솔로 주간 랭킹 보상 */
+  ranking?: { label: string; rank: number; puzzleId: string; weekKey: string; titleId: string; newTitle: boolean };
 }
 
 export interface PlayerGrowthPayload {
@@ -137,6 +145,8 @@ export function emptyGrowth(): PlayerGrowth {
     stats: emptyStats(),
     collected: [],
     daily: null,
+    soloBests: {},
+    rankingRewardWeeks: [],
   };
 }
 
@@ -183,6 +193,7 @@ export function growthView(progress: PlayerGrowth, nowMs = Date.now()): GrowthVi
     loadout: progress.loadout,
     stats: progress.stats,
     collected: progress.collected,
+    soloBests: progress.soloBests,
     daily: { id: goal.id, label: goal.label, progress: Math.min(record.progress, goal.target), target: goal.target, done: record.done, bonus: PROGRESSION_RULES.dailyGoalBonus },
   };
 }
@@ -219,7 +230,21 @@ export function normalizeGrowth(value: unknown): PlayerGrowth {
     daily: daily && typeof daily.day === "string" && typeof daily.goalId === "string"
       ? { day: daily.day, goalId: daily.goalId, progress: count(daily.progress), done: daily.done === true }
       : null,
+    soloBests: normalizeSoloBests(input.soloBests),
+    rankingRewardWeeks: Array.isArray(input.rankingRewardWeeks)
+      ? input.rankingRewardWeeks.filter((week): week is string => typeof week === "string" && /^\d{4}-\d{2}-\d{2}$/.test(week)).slice(-RANKING_WEEKS_KEPT)
+      : [],
   };
+}
+
+const RANKING_WEEKS_KEPT = 12;
+
+function normalizeSoloBests(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .filter((entry): entry is [string, number] => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry[0]) && typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] >= PROGRESSION_RULES.minimumSoloElapsedMs)
+    .slice(0, MAX_COLLECTION)
+    .map(([id, ms]) => [id, Math.round(ms)]));
 }
 
 function collect(growth: PlayerGrowth, keys: readonly string[]): { growth: PlayerGrowth; added: string[] } {
@@ -231,7 +256,7 @@ function collect(growth: PlayerGrowth, keys: readonly string[]): { growth: Playe
 /** 보상과 오늘의 목표 진행을 함께 반영한다. */
 function grant(
   progress: PlayerGrowth,
-  reason: RewardReason,
+  reason: Exclude<RewardReason, "RANKING">,
   before: GrowthView,
   goalIncrements: Partial<Record<GoalMetric, number>>,
   nowMs: number,
@@ -263,7 +288,7 @@ function grant(
 }
 
 /** 종료된 경기에서 이 플레이어가 받을 보상 종류. 보상이 없으면 null. */
-export function matchRewardReason(snapshot: Pick<GameSnapshot, "state" | "winnerId" | "endReason">, playerId: string): Exclude<RewardReason, "SOLO"> | null {
+export function matchRewardReason(snapshot: Pick<GameSnapshot, "state" | "winnerId" | "endReason">, playerId: string): "WIN" | "LOSS" | "DRAW" | null {
   if (snapshot.state !== "FINISHED") return null;
   if (snapshot.winnerId === null) return "DRAW";
   if (snapshot.winnerId === playerId) return "WIN";
@@ -331,8 +356,12 @@ export function grantSoloReward(
   const before = growthView(progress, nowMs);
   const day = koreanDay(nowMs);
   const used = progress.soloRewardDay === day ? progress.soloRewardCount : 0;
+  const previousBest = soloPuzzleId ? progress.soloBests[soloPuzzleId] : undefined;
+  const soloBests = soloPuzzleId && (previousBest === undefined || elapsedMs < previousBest)
+    ? { ...progress.soloBests, [soloPuzzleId]: Math.round(elapsedMs) }
+    : progress.soloBests;
   const collected = collect(
-    { ...progress, stats: { ...progress.stats, soloClears: progress.stats.soloClears + 1 } },
+    { ...progress, soloBests, stats: { ...progress.stats, soloClears: progress.stats.soloClears + 1 } },
     soloPuzzleId ? [`solo:${soloPuzzleId}`] : [],
   );
   if (used >= PROGRESSION_RULES.soloDailyLimit) {
@@ -340,4 +369,29 @@ export function grantSoloReward(
   }
   const granted = grant(collected.growth, "SOLO", before, { soloClears: 1 }, nowMs, collected.added);
   return { progress: { ...granted.progress, soloRewardDay: day, soloRewardCount: used + 1 }, reward: granted.reward, limitReached: false };
+}
+
+/** 솔로 주간 랭킹 보상. 같은 주 보상은 한 번만 받는다. 이미 받았으면 null */
+export function grantRankingReward(
+  progress: PlayerGrowth,
+  grant: WeeklyRewardGrant,
+  nowMs: number,
+): { progress: PlayerGrowth; reward: RewardSummary } | null {
+  if (progress.rankingRewardWeeks.includes(grant.weekKey)) return null;
+  const before = growthView(progress, nowMs);
+  const newTitle = !progress.ownedItems.includes(grant.titleId);
+  const next: PlayerGrowth = {
+    ...progress,
+    coins: progress.coins + grant.coins,
+    ownedItems: newTitle ? [...progress.ownedItems, grant.titleId] : progress.ownedItems,
+    rankingRewardWeeks: [...progress.rankingRewardWeeks, grant.weekKey].slice(-RANKING_WEEKS_KEPT),
+  };
+  const after = growthView(next, nowMs);
+  return {
+    progress: next,
+    reward: {
+      reason: "RANKING", xp: 0, coins: grant.coins, before, after, leveledUp: false,
+      ranking: { label: grant.label, rank: grant.rank, puzzleId: grant.puzzleId, weekKey: grant.weekKey, titleId: grant.titleId, newTitle },
+    },
+  };
 }

@@ -20,12 +20,12 @@ describe("puzzle catalog on the web", () => {
     const bundled = toVisual({ ...remote, id: "cozy-cafe", originalUrl: undefined, modifiedUrl: undefined })!;
     expect(bundled.originalSrc).not.toMatch(/^https:\/\/img\.example\.com/);
     expect(toVisual({ ...remote, id: "unknown-without-url", originalUrl: undefined, modifiedUrl: undefined })).toBeNull();
-    expect(toVisual({ ...remote, mode: "solo" })).toBeNull();
+    expect(toVisual({ ...remote, mode: "solo" })).toMatchObject({ mode: "solo", key: "solo:night-market" });
   });
 
   it("ships every bundled puzzle as a playable fallback", () => {
     expect(BUNDLED_VISUALS).toHaveLength(bundledPuzzleCards().length);
-    expect(BUNDLED_VISUALS.filter((visual) => visual.mode === "solo").every((visual) => visual.answers?.length === 5)).toBe(true);
+    expect(BUNDLED_VISUALS.filter((visual) => visual.mode === "solo")).toHaveLength(BUNDLED_SOLO_PUZZLES.length);
     for (const puzzle of BUNDLED_SOLO_PUZZLES) expect(SOLO_ASSET_MANIFEST[puzzle.id].version).toBe(puzzle.version);
     expect(featuredVisual([], new Date(0))).toBe(BUNDLED_VISUALS[0]);
   });

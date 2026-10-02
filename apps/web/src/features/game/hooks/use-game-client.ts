@@ -9,9 +9,13 @@ import type {
   MatchSettings,
   MatchFoundPayload,
   NormalizedPoint,
+  RankingPayload,
+  RankingPeriod,
   ReportReason,
   RewardSummary,
   SessionReadyPayload,
+  SoloGuessResultPayload,
+  SoloStartedPayload,
 } from "@spot-battle/shared";
 import { useEffect, useRef, useState } from "react";
 import { createGameConnection, type GameConnection } from "../transport/game-connection.js";
@@ -47,6 +51,8 @@ function writeStorage(key: string, value: string): void {
   }
 }
 
+export type GameClient = ReturnType<typeof useGameClient>;
+
 export function useGameClient() {
   const socketRef = useRef<GameSocket | null>(null);
   const snapshotRef = useRef<GameSnapshot | null>(null);
@@ -65,6 +71,15 @@ export function useGameClient() {
   const [matchRewards, setMatchRewards] = useState<Readonly<Record<string, RewardSummary>>>({});
   const [soloResult, setSoloResult] = useState<{ reward: RewardSummary | null; limitReached: boolean } | null>(null);
   const soloPendingRef = useRef(false);
+  /** 서버가 판정하는 솔로 판 */
+  const [soloRun, setSoloRun] = useState<SoloStartedPayload | null>(null);
+  const soloRunIdRef = useRef<string | null>(null);
+  const [soloMarks, setSoloMarks] = useState<FoundMark[]>([]);
+  const [soloLast, setSoloLast] = useState<SoloGuessResultPayload | null>(null);
+  /** "<그림 ID>|week" 같은 키로 받은 순위표 */
+  const [rankings, setRankings] = useState<Readonly<Record<string, RankingPayload>>>({});
+  /** 아직 보여주지 않은 주간 랭킹 보상 */
+  const [rankingRewards, setRankingRewards] = useState<RewardSummary[]>([]);
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
   const dismissedRef = useRef(new Set<string>());
@@ -115,16 +130,39 @@ export function useGameClient() {
       }
     });
     socket.on("game:error", (payload) => {
+      // 시작하지 못한 솔로 판은 대기 상태를 푼다.
+      if (soloRunIdRef.current === "pending" && ["PUZZLE_NOT_FOUND", "INVALID_NICKNAME", "SERVER_BUSY"].includes(payload.code)) {
+        soloRunIdRef.current = null;
+        setSoloRun(null);
+      }
       if (QUEUE_REJECTION_CODES.has(payload.code) && phaseRef.current === "MATCHING") setPhase("LOBBY");
       if (SILENT_ERROR_CODES.has(payload.code)) return;
       setError(payload);
     });
     socket.on("game:report-result", ({ reportId: id }) => setReportId(id));
+    socket.on("solo:started", (payload) => {
+      if (payload.runId !== soloRunIdRef.current && soloRunIdRef.current !== "pending") return;
+      soloRunIdRef.current = payload.runId;
+      setClockOffsetMs(payload.serverNowMs - Date.now());
+      setSoloRun(payload);
+    });
+    socket.on("solo:guess-result", (payload) => {
+      if (payload.runId !== soloRunIdRef.current) return;
+      setClockOffsetMs(payload.serverNowMs - Date.now());
+      setSoloLast(payload);
+      const mark = payload.mark;
+      if (mark) setSoloMarks((current) => current.some((found) => found.differenceId === mark.differenceId) ? current : [...current, { differenceId: mark.differenceId, region: mark.region }]);
+    });
+    socket.on("ranking:list", (payload) => setRankings((current) => ({ ...current, [`${payload.puzzleId}|${payload.period}`]: payload })));
     socket.on("player:growth", (payload) => {
       setGrowth(payload.progress);
       const { matchId, reward } = payload;
       if (matchId && reward) setMatchRewards((current) => ({ ...current, [matchId]: reward }));
       // A plain sync after reconnecting carries neither field, so it does not settle a pending solo result.
+      if (reward?.reason === "RANKING") {
+        setRankingRewards((current) => [...current, reward]);
+        return;
+      }
       if (!matchId && soloPendingRef.current && (reward || payload.soloLimitReached)) {
         soloPendingRef.current = false;
         setSoloResult({ reward: reward ?? null, limitReached: Boolean(payload.soloLimitReached) });
@@ -165,11 +203,36 @@ export function useGameClient() {
       setError(null);
       socketRef.current?.emit("shop:equip", { itemId });
     },
-    completeSolo: (puzzleId: string, elapsedMs: number) => {
+    /** 진행 중인 솔로 판. 서버가 시작 시각과 판 ID를 준다. */
+    soloRun,
+    soloMarks,
+    /** 마지막 솔로 판정. 다 찾으면 finished에 서버가 잰 기록이 있다. */
+    soloLast,
+    /** 그림을 다 불러온 뒤 솔로 판을 연다. 카운트다운은 서버 시각 기준이다. */
+    startSolo: (puzzleId: string) => {
+      setError(null);
+      soloRunIdRef.current = "pending";
       soloPendingRef.current = true;
-      setSoloResult(null);
-      socketRef.current?.emit("solo:complete", { puzzleId, elapsedMs });
+      setSoloRun(null); setSoloMarks([]); setSoloLast(null); setSoloResult(null);
+      socketRef.current?.emit("solo:start", { puzzleId, nickname });
     },
+    guessSolo: (point: NormalizedPoint, input: { pointerType?: string; boardSizePx?: number } = {}) => {
+      const now = Date.now();
+      if (now - lastGuessAtRef.current < CLIENT_GUESS_INTERVAL_MS) return;
+      const runId = soloRunIdRef.current;
+      if (!runId || runId === "pending") return;
+      lastGuessAtRef.current = now;
+      socketRef.current?.emit("solo:guess", { runId, point, ...input });
+    },
+    leaveSolo: () => {
+      soloRunIdRef.current = null;
+      soloPendingRef.current = false;
+      setSoloRun(null); setSoloMarks([]); setSoloLast(null);
+    },
+    rankings,
+    requestRanking: (puzzleId: string, period: RankingPeriod) => socketRef.current?.emit("ranking:get", { puzzleId, period }),
+    rankingRewards,
+    dismissRankingReward: () => setRankingRewards((current) => current.slice(1)),
     saveNickname: (value: string) => {
       const normalized = value.trim().slice(0, 16);
       if (normalized.length < 2) {

@@ -1,7 +1,7 @@
 # 기술 설계
 
 > 문서 상태: CURRENT
-> 기준일: 2026-10-01
+> 기준일: 2026-10-02
 > 게임 규칙은 `GAME_RULES.md`를 따른다.
 
 ## 운영 구조
@@ -25,7 +25,7 @@ Worker는 `apps/server`의 `CatalogService`, `parseCatalog`, `SupabasePostgresMa
 - `"database"`: `puzzle_catalog`의 활성 행을 읽어 검증하고 5분마다 다시 읽는다. 다시 읽기에 실패하면 마지막 정상 목록을 유지한다. 이미지 주소는 `PUZZLE_ASSET_BASE_URL` + object key로 만든다.
 - 그림 ID와 버전은 형식(`PUZZLE_ID_PATTERN`, `YYYY-MM-DD.N`)만 검사하므로 새 그림은 코드 수정 없이 추가된다. 대결 그림은 `GameMatch` 규칙으로, 솔로 그림은 차이 5개로 검증한다.
 - 경기마다 활성 대결 그림 중 10점(`GAME_CONFIG.puzzlesPerMatch`)을 무작위로 뽑는다.
-- `GET /catalog`는 공개 카드(제목·화풍·설명·이미지 주소, 솔로 정답)를 준다. **대결 정답은 절대 포함하지 않는다.** `match:found`에는 이번 경기 그림 카드(`deck`)가 들어 있다.
+- `GET /catalog`는 공개 카드(제목·화풍·설명·이미지 주소)를 준다. **정답은 대결·솔로 모두 포함하지 않는다.** `match:found`에는 이번 경기 그림 카드(`deck`)가 들어 있다.
 - 웹은 `/catalog`를 10분마다 읽고, 실패하면 번들 그림으로 진행한다.
 - 등록은 `pnpm puzzle`(`scripts/puzzle-publish.mjs`)로 한다. 절차는 `GAME_ASSETS.md`를 본다.
 
@@ -43,10 +43,19 @@ Worker는 `apps/server`의 `CatalogService`, `parseCatalog`, `SupabasePostgresMa
 
 ## 성장 기록
 
-- 규칙: `PROGRESSION_RULES`, `COSMETIC_ITEMS`, `DAILY_GOALS`(공유 패키지). 정산은 `settleMatch`, `grantSoloReward`, `buyCosmetic`, `equipCosmetic`.
-- 이벤트: `player:growth`(접속 직후·보상·구매 때), `solo:complete`, `shop:buy`, `shop:equip`.
+- 규칙: `PROGRESSION_RULES`, `COSMETIC_ITEMS`, `DAILY_GOALS`(공유 패키지). 정산은 `settleMatch`, `grantSoloReward`, `grantRankingReward`, `buyCosmetic`, `equipCosmetic`.
+- 이벤트: `player:growth`(접속 직후·보상·구매 때), `shop:buy`, `shop:equip`.
 - 저장: Durable Object 세션이 원본이다. 바뀐 기록은 약 10초 안에 Supabase `player_growth`로 일괄 upsert하고, 실패하면 1분 뒤 다시 시도한다. 백업 전 기록은 만료·정리하지 않는다.
 - 복원: DO에서 정리된 플레이어가 같은 게스트 토큰으로 접속하면 토큰 SHA-256(`token_hash`)으로 찾아 복원한다. 조회가 실패하면 새 토큰을 발급하지 않고 잠시 뒤 다시 시도하게 한다.
+
+## 솔로 판정과 랭킹
+
+- 판정 규칙은 공유 패키지 `solo.ts`(`startSoloRun`, `guessSoloRun`), 순위 규칙은 `leaderboard.ts`(`submitRecord`, `rankingPayload`, `weeklyRewards`)다. 두 서버는 `apps/server/src/game/solo-league.ts`의 `SoloLeague`를 함께 쓴다.
+- 솔로 정답은 서버에만 있다. 번들 정답은 `apps/server/src/game/solo-puzzles.ts`, DB 그림은 `puzzle_catalog` 행이다. `/catalog`와 웹 번들에는 솔로 정답도 넣지 않는다.
+- 이벤트: `solo:start {puzzleId, nickname}` → `solo:started {runId, startsAtMs, serverNowMs}`, `solo:guess {runId, point, pointerType, boardSizePx}` → `solo:guess-result`(다 찾으면 `finished`에 기록·개인 최고·주간/전체 순위), `ranking:get {puzzleId, period}` → `ranking:list`.
+- 진행 중인 판은 세션(`soloRun`)에 저장하므로 재접속해도 이어진다. 판 ID가 다르거나 그림 버전이 바뀌면 거절한다.
+- 운영 Worker는 순위표를 Durable Object 저장소의 `league:board:<그림 ID>|all`, `league:board:<그림 ID>|w:<주 월요일>`에, 정산 상태와 미수령 보상을 `league:meta`에 둔다. 끝난 주간 순위표는 정산하면서 지운다. Node 개발 서버는 메모리에만 둔다.
+- 순위표 응답에는 플레이어 ID를 넣지 않는다.
 
 ## 이미지 로드
 
@@ -60,7 +69,7 @@ Worker는 `apps/server`의 `CatalogService`, `parseCatalog`, `SupabasePostgresMa
 - 대결 정답 영역은 서버 전용이다. 상대의 발견 위치는 결과 전 전송하지 않는다.
 - 상태·그림·버전이 다른 입력은 거절하고, 동일 정답 중복과 입력 잠금 중 요청은 무시한다.
 - 마감과 순서는 서버 수신 시각으로 판정하고, 선택 요청에 속도 제한(120ms)을 둔다.
-- 보상·코인은 클라이언트 값을 믿지 않는다. 3초보다 빠른 솔로 완주는 보상하지 않는다.
+- 보상·코인·솔로 기록은 클라이언트 값을 믿지 않는다. 솔로 시간은 서버가 재고, 3초보다 빠른 솔로 완주는 보상·랭킹에서 뺀다.
 - WebSocket·`/catalog`는 허용된 Origin(같은 사이트, 앱인토스·Android·iOS 앱 주소)에만 연다.
 - DB 연결 문자열·R2 키는 저장소와 브라우저에 넣지 않는다.
 

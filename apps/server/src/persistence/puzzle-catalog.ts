@@ -8,6 +8,7 @@ import {
   type PuzzleCard,
   type SoloAnswer,
 } from "@spot-battle/shared";
+import type { SoloPuzzle } from "../game/solo-puzzles.js";
 import { Pool } from "pg";
 import type { LoadedCatalog } from "../game/catalog-service.js";
 
@@ -60,8 +61,9 @@ function metadataOf(row: CatalogRow): { mode: "battle" | "solo"; genre: ArtGenre
 
 export interface ParsedCatalogRow {
   card: PuzzleCard;
-  /** 대결 문제만 있다. 정답이 들어 있어 서버 밖으로 보내지 않는다. */
+  /** 정답이 들어 있어 서버 밖으로 보내지 않는다. 대결·솔로 중 하나만 있다. */
   battle?: MatchPuzzle;
+  solo?: SoloPuzzle;
 }
 
 /**
@@ -98,13 +100,13 @@ export function parseCatalogRow(row: CatalogRow, assetBaseUrl?: string): ParsedC
   };
   if (mode === "solo") {
     if (differences.length !== SOLO_ANSWER_COUNT) throw new Error(`Solo puzzle needs ${SOLO_ANSWER_COUNT} differences: ${id}`);
-    card.answers = differences.map(({ id: answerId, label, regions }): SoloAnswer => ({
+    const answers = differences.map(({ id: answerId, label, regions }): SoloAnswer => ({
       id: answerId,
       label,
       region: regions[0]!,
       ...(regions.length > 1 ? { extraRegions: regions.slice(1) } : {}),
     }));
-    return { card };
+    return { card, solo: { id, version: row.asset_version, answers } };
   }
   const puzzle = { id, assetVersion: row.asset_version, differences } as MatchPuzzle;
   new GameMatch("catalog-validation", [puzzle], [
@@ -119,16 +121,18 @@ export function parseCatalog(rows: readonly CatalogRow[], assetBaseUrl?: string)
   if (!Array.isArray(rows) || !rows.length) throw new Error("Active puzzle_catalog is empty.");
   const seen = new Set<string>();
   const battle: MatchPuzzle[] = [];
+  const solo: SoloPuzzle[] = [];
   const cards: PuzzleCard[] = [];
   for (const row of rows) {
     const parsed = parseCatalogRow(row, assetBaseUrl);
     if (seen.has(parsed.card.id)) throw new Error(`Duplicate active catalog puzzle: ${parsed.card.id}`);
     seen.add(parsed.card.id);
     if (parsed.battle) battle.push(parsed.battle);
+    if (parsed.solo) solo.push(parsed.solo);
     cards.push(parsed.card);
   }
   if (!battle.length) throw new Error("Active puzzle_catalog has no battle puzzles.");
-  return { battle, cards };
+  return { battle, solo, cards };
 }
 
 export const ACTIVE_CATALOG_SQL =

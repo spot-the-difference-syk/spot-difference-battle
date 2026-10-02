@@ -7,6 +7,33 @@ import type {
 } from "../game/types.js";
 import type { PublicCosmetics } from "../game/cosmetics.js";
 import type { PlayerGrowthPayload } from "../game/progression.js";
+import type { RankingPayload, RankingPeriod } from "../game/leaderboard.js";
+import type { FoundMark } from "../game/types.js";
+
+export interface SoloStartedPayload {
+  runId: string;
+  puzzleId: string;
+  puzzleVersion: string;
+  startsAtMs: number;
+  serverNowMs: number;
+}
+
+export interface SoloGuessResultPayload {
+  runId: string;
+  correct: boolean;
+  mark?: FoundMark & { label: string };
+  foundCount: number;
+  wrongCount: number;
+  serverNowMs: number;
+  /** 다 찾았을 때만 있다. 기록은 서버가 잰 값이다. */
+  finished?: {
+    elapsedMs: number;
+    personalBestMs: number;
+    newPersonalBest: boolean;
+    weekRank: number | null;
+    allRank: number | null;
+  };
+}
 import type { GamePuzzleId } from "../puzzles/asset-manifest.js";
 import type { PuzzleCard } from "../puzzles/catalog.js";
 
@@ -66,6 +93,12 @@ export interface ServerToClientEvents {
   "game:report-result": (payload: ReportResultPayload) => void;
   /** 레벨·코인 동기화. 접속 직후와 보상을 받을 때 보낸다. */
   "player:growth": (payload: PlayerGrowthPayload) => void;
+  /** 솔로 판이 시작됐다. startsAtMs(서버 시각)부터 입력을 받고 시간을 잰다. */
+  "solo:started": (payload: SoloStartedPayload) => void;
+  /** 솔로 클릭 판정 */
+  "solo:guess-result": (payload: SoloGuessResultPayload) => void;
+  /** 솔로 랭킹 */
+  "ranking:list": (payload: RankingPayload) => void;
 }
 
 export interface ClientToServerEvents {
@@ -90,8 +123,12 @@ export interface ClientToServerEvents {
     reason: ReportReason;
     details?: string;
   }) => void;
-  /** 솔로 타임어택 완주. 서버가 하루 한도 안에서 보상한다. */
-  "solo:complete": (payload: { puzzleId: string; elapsedMs: number }) => void;
+  /** 솔로 판 시작. 그림을 다 불러온 뒤 보낸다. */
+  "solo:start": (payload: { puzzleId: string; nickname: string }) => void;
+  /** 솔로 클릭. 서버가 정답·시간을 판정한다. */
+  "solo:guess": (payload: { runId: string; point: NormalizedPoint; pointerType?: string; boardSizePx?: number }) => void;
+  /** 솔로 랭킹 보기 */
+  "ranking:get": (payload: { puzzleId: string; period: RankingPeriod }) => void;
   /** 꾸미기 아이템을 코인으로 사고 바로 착용한다. */
   "shop:buy": (payload: { itemId: string }) => void;
   /** 가지고 있는 꾸미기 아이템을 착용한다. */

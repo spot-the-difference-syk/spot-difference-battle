@@ -1,13 +1,13 @@
 # 게임 데이터베이스 설계
 
 > 문서 상태: CURRENT  
-> 기준일: 2026-10-01
+> 기준일: 2026-10-02
 
 ## 목표
 
 Supabase 프로젝트 `usigggufvapufvbyugbr`의 PostgreSQL 한 곳에서 결과 조회, 신고 검토, 그림 목록과 성장 기록 백업을 관리한다. 운영 Worker는 Hyperdrive로 연결한다.
 조회가 잦은 결과 값만 일반 열로 두고, 버전이 자주 바뀌는 경기 내부 상태와 퍼즐 정답은
-JSONB 스냅샷으로 보존한다. 솔로 최고 기록은 기기 로컬에만 저장하고, 솔로 보상·수집은 `player_growth`에 반영된다.
+JSONB 스냅샷으로 보존한다. 솔로 보상·수집·그림별 최고 기록(`soloBests`)은 `player_growth`에 반영된다. 솔로 랭킹 순위표는 아직 운영 Worker의 Durable Object 저장소에만 있다.
 
 | 테이블 | 운영 Worker | 로컬 Node 개발 서버 |
 |---|---|---|
