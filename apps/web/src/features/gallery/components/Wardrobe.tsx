@@ -1,6 +1,7 @@
 import {
   COSMETIC_ITEMS,
   COSMETIC_ITEM_BY_ID,
+  DEFAULT_LOADOUT,
   type CosmeticItem,
   type CosmeticSlot,
   type GameErrorPayload,
@@ -35,6 +36,9 @@ function statusText(entry: CosmeticItem, state: ItemState): string {
   return `${entry.price.toLocaleString("ko-KR")}코인`;
 }
 
+const DEFAULT_IDS = new Set(Object.values(DEFAULT_LOADOUT));
+const rank = (entry: CosmeticItem) => DEFAULT_IDS.has(entry.id) ? 0 : entry.premium ? 1 : entry.rewardOnly ? 3 : 2;
+
 function Swatch({ entry, nickname, locked }: { entry: CosmeticItem; nickname: string; locked: boolean }) {
   const light = entry.slot === "avatar" || entry.slot === "profile" || entry.slot === "title";
   return <span className={`item-swatch ${light ? "light" : ""} ${locked ? "locked" : ""}`} aria-hidden>
@@ -43,6 +47,7 @@ function Swatch({ entry, nickname, locked }: { entry: CosmeticItem; nickname: st
     {entry.slot === "avatar" && <LevelAvatar nickname={nickname} growth={null} size={52} avatar={entry.id}/>}
     {entry.slot === "profile" && <LevelAvatar nickname={nickname} growth={null} size={44} profile={entry.id}/>}
     {entry.slot === "title" && <span className="title-chip">{entry.name}</span>}
+    {entry.premium && <span className="premium-badge">명작</span>}
     {locked && <Lock size={14} className="absolute right-2 top-2 text-[var(--mute)]" style={{ opacity: 1 }}/>}
   </span>;
 }
@@ -57,9 +62,9 @@ export function Wardrobe({ nickname, growth, error, onTab, onBuy, onEquip }: {
 }) {
   const [slot, setSlot] = useState<CosmeticSlot>("marker");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  // 해금 레벨·가격 순으로 늘어놓아 앞으로 무엇을 얻을지 보이게 한다. 랭킹 보상은 맨 뒤
+  // 기본 아이템 → 명작 컬렉션 → 해금 레벨·가격 순. 랭킹 보상은 맨 뒤
   const items = COSMETIC_ITEMS.filter((entry) => entry.slot === slot)
-    .sort((a, b) => Number(Boolean(a.rewardOnly)) - Number(Boolean(b.rewardOnly)) || a.minLevel - b.minLevel || a.price - b.price);
+    .sort((a, b) => rank(a) - rank(b) || a.minLevel - b.minLevel || a.price - b.price);
   const current = COSMETIC_ITEM_BY_ID[selectedId ?? growth?.loadout[slot] ?? ""];
   const visibleSelected = current?.slot === slot ? current : items[0]!;
   // Preview the selected item on top of what is already equipped.
@@ -99,7 +104,7 @@ export function Wardrobe({ nickname, growth, error, onTab, onBuy, onEquip }: {
           </div>
 
           <div className="wardrobe-action">
-            <p className="muted text-center text-[13px]">{visibleSelected.name} · {visibleSelected.description}</p>
+            <p className="muted text-center text-[13px]">{visibleSelected.premium ? "명작 컬렉션 · " : ""}{visibleSelected.name} · {visibleSelected.description}</p>
             {error && <p role="alert" className="text-center text-[13px] font-semibold text-[#c0392b]">{error.message}</p>}
             {state === "EQUIPPED" && <button type="button" className="btn-primary" disabled>사용 중이에요</button>}
             {state === "OWNED" && <button data-testid="item-equip" type="button" className="btn-primary" onClick={() => onEquip(visibleSelected.id)}>사용하기</button>}

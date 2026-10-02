@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><defs><radialGradient id="k-pond" cx=".5" cy=".45" r=".75"><stop offset="0" stop-color="#4fb3b0"/><stop offset=".7" stop-color="#1f6f7a"/><stop offset="1" stop-color="#124a55"/></radialGradient></defs>
+<style>.spin{animation:spin 24s linear infinite;transform-origin:64px 64px}@keyframes spin{to{transform:rotate(360deg)}}.rip{animation:rip 4s ease-out infinite;transform-origin:var(--o)}@keyframes rip{from{transform:scale(.4);opacity:.7}to{transform:scale(1.6);opacity:0}}@media (prefers-reduced-motion: reduce){*{animation:none!important}}</style>
+<rect width="128" height="128" fill="url(#k-pond)"/>
+<circle class="rip" style="--o:30px 96px" cx="30" cy="96" r="10" fill="none" stroke="#bfeee8" stroke-width="1.2"/>
+<circle class="rip" style="--o:100px 30px;animation-delay:2s" cx="100" cy="30" r="10" fill="none" stroke="#bfeee8" stroke-width="1.2"/>
+<g transform="translate(64 64) scale(.82) translate(-64 -64)"><g class="spin"><g transform="translate(-17 0) rotate(-14 64 64)">
+<path d="M64 26c12 0 20 8 20 18 0 12-8 20-16 26l-4 10-4-10c-8-6-16-14-16-26 0-10 8-18 20-18Z" fill="#fbf3ea"/>
+<path d="M60 80l4 10 4-10c-1 4-3 6-4 6s-3-2-4-6Z" fill="#fbf3ea"/>
+<path d="M64 86c-6 6-10 12-8 18 4-4 6-8 8-12 2 4 4 8 8 12 2-6-2-12-8-18Z" fill="#fbf3ea" opacity=".85"/>
+<path d="M50 48c-8 0-12 4-14 8 6 0 10-2 14-4ZM78 48c8 0 12 4 14 8-6 0-10-2-14-4Z" fill="#fbf3ea" opacity=".7"/>
+<path d="M56 40c4-2 10 0 10 6-4 2-8 0-10-6ZM66 56c4 0 6 4 4 8-4 0-6-4-4-8Z" fill="#e2452f"/>
+<circle cx="58" cy="34" r="1.8" fill="#1b1b1b"/><circle cx="70" cy="34" r="1.8" fill="#1b1b1b"/>
+<path d="M58 30c4-2 8-2 12 0" stroke="#fff" stroke-width="1.2" opacity=".6" fill="none"/></g><g transform="rotate(180 64 64) translate(-17 0) rotate(-14 64 64)">
+<path d="M64 26c12 0 20 8 20 18 0 12-8 20-16 26l-4 10-4-10c-8-6-16-14-16-26 0-10 8-18 20-18Z" fill="#f08a2a"/>
+<path d="M60 80l4 10 4-10c-1 4-3 6-4 6s-3-2-4-6Z" fill="#f08a2a"/>
+<path d="M64 86c-6 6-10 12-8 18 4-4 6-8 8-12 2 4 4 8 8 12 2-6-2-12-8-18Z" fill="#f08a2a" opacity=".85"/>
+<path d="M50 48c-8 0-12 4-14 8 6 0 10-2 14-4ZM78 48c8 0 12 4 14 8-6 0-10-2-14-4Z" fill="#f08a2a" opacity=".7"/>
+<path d="M58 44c4-3 10-1 10 4-4 2-8 1-10-4ZM60 60c5-1 8 2 6 6-4 0-6-2-6-6Z" fill="#fbf3ea"/>
+<circle cx="58" cy="34" r="1.8" fill="#1b1b1b"/><circle cx="70" cy="34" r="1.8" fill="#1b1b1b"/>
+<path d="M58 30c4-2 8-2 12 0" stroke="#fff" stroke-width="1.2" opacity=".6" fill="none"/></g></g></g>
+<path d="M96 96c10-8 24-4 26 6-8 10-22 10-26 4l8-4Z" fill="#3f8f4a"/><path d="M104 100l-8-4" stroke="#2c6a36" stroke-width="1.5"/>
+<path d="M14 22c6-6 16-6 20 0-6 6-14 6-20 0Z" fill="#4f9f5a"/>
+<circle cx="112" cy="104" r="3" fill="#f7b6c8"/><circle cx="110" cy="102" r="2" fill="#fbd3df"/></svg>
