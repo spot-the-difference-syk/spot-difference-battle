@@ -24,7 +24,8 @@ Worker는 `apps/server`의 `CatalogService`, `parseCatalog`, `SupabasePostgresMa
 - `PUZZLE_CATALOG_SOURCE="code"`(기본): 앱 번들에 들어 있는 그림 15점(대결 10, 솔로 5)을 쓴다.
 - `"database"`: `puzzle_catalog`의 활성 행을 읽어 검증하고 5분마다 다시 읽는다. 다시 읽기에 실패하면 마지막 정상 목록을 유지한다. 이미지 주소는 `PUZZLE_ASSET_BASE_URL` + object key로 만든다.
 - 그림 ID와 버전은 형식(`PUZZLE_ID_PATTERN`, `YYYY-MM-DD.N`)만 검사하므로 새 그림은 코드 수정 없이 추가된다. 대결 그림은 `GameMatch` 규칙으로, 솔로 그림은 차이 5개로 검증한다.
-- 경기마다 활성 대결 그림 중 10점(`GAME_CONFIG.puzzlesPerMatch`)을 무작위로 뽑는다.
+- 경기마다 화풍 하나를 무작위로 정하고(3점 미만 화풍 제외) 그 화풍 그림 중 최대 10점을 무작위로 뽑는다(`CatalogService.pickDeck`). 웹은 `match:found`의 `deck` 카드 화풍으로 이번 화풍을 보여준다.
+- 대결 설정은 모드뿐이다(`MatchSettings`). 예전 앱이 보내는 `difficulty`나 저장된 예전 경기의 난이도는 `matchSettingsFrom`이 버린다. `matches.difficulty` 열에는 `NORMAL`을 넣는다.
 - `GET /catalog`는 공개 카드(제목·화풍·설명·이미지 주소)를 준다. **정답은 대결·솔로 모두 포함하지 않는다.** `match:found`에는 이번 경기 그림 카드(`deck`)가 들어 있다.
 - 웹은 `/catalog`를 10분마다 읽고, 실패하면 번들 그림으로 진행한다.
 - 등록은 `pnpm puzzle`(`scripts/puzzle-publish.mjs`)로 한다. 절차는 `GAME_ASSETS.md`를 본다.

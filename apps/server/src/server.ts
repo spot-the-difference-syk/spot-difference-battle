@@ -1,10 +1,8 @@
 import cors from "@fastify/cors";
 import { GameMatch, GameRuleError, type MatchPuzzle } from "@spot-battle/game-core";
 import {
-  DEFAULT_MATCH_SETTINGS,
   GAME_CONFIG,
-  GAME_DIFFICULTIES,
-  GAME_MODES,
+  matchSettingsFrom,
   buyCosmetic,
   emptyGrowth,
   equipCosmetic,
@@ -164,7 +162,7 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
   const finishedMatchRetentionMs = options.finishedMatchRetentionMs ?? 5 * 60 * 1_000;
   type WaitingPlayer = { playerId: string; socketId: string; nickname: string; settings: MatchSettings };
   const waitingPlayers = new Map<string, WaitingPlayer>();
-  const queueKey = ({ mode, difficulty }: MatchSettings) => `${mode}:${difficulty}`;
+  const queueKey = ({ mode }: MatchSettings) => mode;
   const removeWaitingPlayer = (playerId: string) => {
     for (const [key, player] of waitingPlayers) {
       if (player.playerId === playerId) waitingPlayers.delete(key);
@@ -510,17 +508,9 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
           throw new GameRuleError("INVALID_NICKNAME", "닉네임은 2자 이상이어야 합니다.");
         }
         const input = requirePayload(payload);
-        if (input.settings !== undefined && (typeof input.settings !== "object" || Array.isArray(input.settings))) {
-          throw new GameRuleError("INVALID_SETTINGS", "게임 설정 형식이 올바르지 않습니다.");
-        }
-        const rawSettings = (input.settings ?? DEFAULT_MATCH_SETTINGS) as Record<string, unknown>;
-        if (!GAME_MODES.includes(rawSettings.mode as never) || !GAME_DIFFICULTIES.includes(rawSettings.difficulty as never)) {
-          throw new GameRuleError("INVALID_SETTINGS", "지원하지 않는 게임 모드 또는 난이도입니다.");
-        }
-        const settings: MatchSettings = {
-          mode: rawSettings.mode as MatchSettings["mode"],
-          difficulty: rawSettings.difficulty as MatchSettings["difficulty"],
-        };
+        // 예전 앱이 보내는 난이도는 무시한다.
+        const settings = matchSettingsFrom(input.settings);
+        if (!settings) throw new GameRuleError("INVALID_SETTINGS", "지원하지 않는 게임 모드입니다.");
         const key = queueKey(settings);
         session.nickname = normalizedNickname;
         persistGuest(session);

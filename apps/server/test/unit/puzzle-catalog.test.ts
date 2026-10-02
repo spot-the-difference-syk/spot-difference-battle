@@ -134,6 +134,29 @@ describe("catalog service", () => {
     expect(new Set(deck.map((puzzle) => puzzle.id)).size).toBe(10);
   });
 
+  it("deals one random genre per match and skips genres with too few puzzles", () => {
+    const service = new CatalogService(codeCatalog());
+    const groups = service.battleGenres();
+    const genreOf = new Map([...groups].flatMap(([genre, puzzles]) => puzzles.map((puzzle) => [puzzle.id, genre] as const)));
+    // 번들: 실사 5, 카툰 3, 회화 1, 애니 1 → 실사·카툰만 뽑힌다.
+    expect(groups.get("실사")).toHaveLength(5);
+    const seen = new Set<string>();
+    for (let index = 0; index < 40; index += 1) {
+      const deck = service.pickDeck();
+      const genres = new Set(deck.map((puzzle) => genreOf.get(puzzle.id)));
+      expect(genres.size).toBe(1);
+      seen.add([...genres][0]!);
+      expect(deck).toHaveLength(groups.get([...genres][0]!)!.length);
+    }
+    expect([...seen].sort()).toEqual(["실사", "카툰"]);
+    expect(new Set(service.pickDeck(() => 0).map((puzzle) => genreOf.get(puzzle.id)))).toEqual(new Set([[...groups].find(([, puzzles]) => puzzles.length >= 3)![0]]));
+  });
+
+  it("falls back to every puzzle when no genre has enough puzzles", () => {
+    const service = new CatalogService(codeCatalog([GAME_PUZZLES[0]!, GAME_PUZZLES[3]!]));
+    expect(service.pickDeck()).toHaveLength(2);
+  });
+
   it("serves bundled cards without answers and keeps solo answers on the server", () => {
     const service = new CatalogService(codeCatalog());
     expect(service.cards.filter((card) => card.mode === "battle")).toHaveLength(GAME_PUZZLES.length);

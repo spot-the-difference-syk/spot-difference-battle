@@ -83,10 +83,26 @@ export class CatalogService {
     return this.current.cards;
   }
 
-  /** 한 경기용 그림을 무작위로 고른다. */
-  pickDeck(): MatchPuzzle[] {
-    return [...this.current.battle]
-      .map((puzzle) => ({ puzzle, order: Math.random() }))
+  /** 대결 그림을 화풍별로 묶는다. 카드가 없는 그림은 화풍을 알 수 없으므로 "기타"로 둔다. */
+  battleGenres(): Map<string, MatchPuzzle[]> {
+    const genreOf = new Map(this.current.cards.filter((card) => card.mode === "battle").map((card) => [`${card.id}@${card.version}`, card.genre]));
+    const groups = new Map<string, MatchPuzzle[]>();
+    for (const puzzle of this.current.battle) {
+      const genre = genreOf.get(`${puzzle.id}@${puzzle.assetVersion}`) ?? "기타";
+      groups.set(genre, [...(groups.get(genre) ?? []), puzzle]);
+    }
+    return groups;
+  }
+
+  /**
+   * 한 경기용 그림을 고른다. 매번 화풍 하나를 무작위로 정하고 그 화풍 그림만 섞어서 쓴다.
+   * 그림이 너무 적은 화풍(minPuzzlesPerGenre 미만)은 고르지 않는다. 그런 화풍만 있으면 전체에서 섞는다.
+   */
+  pickDeck(random: () => number = Math.random): MatchPuzzle[] {
+    const eligible = [...this.battleGenres().values()].filter((puzzles) => puzzles.length >= GAME_CONFIG.minPuzzlesPerGenre);
+    const pool = eligible.length ? eligible[Math.floor(random() * eligible.length)]! : this.current.battle;
+    return [...pool]
+      .map((puzzle) => ({ puzzle, order: random() }))
       .sort((left, right) => left.order - right.order)
       .slice(0, GAME_CONFIG.puzzlesPerMatch)
       .map(({ puzzle }) => structuredClone(puzzle));

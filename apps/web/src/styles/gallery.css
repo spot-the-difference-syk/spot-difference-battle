@@ -998,6 +998,25 @@ body {
   font-weight: 700;
 }
 
+.match-genre {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  color: var(--mute);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.match-genre strong {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+}
+
 /* ---------- solo ranking ---------- */
 
 .ranking-board {
