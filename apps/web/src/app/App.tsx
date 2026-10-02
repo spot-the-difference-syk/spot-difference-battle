@@ -1,5 +1,5 @@
-import { GAME_DIFFICULTY_RULES, GAME_MODE_RULES, type GameDifficulty, type GameMode, type GamePuzzleId, type NormalizedPoint, type ReportReason } from "@spot-battle/shared";
-import { Flag, LogOut, WifiOff } from "lucide-react";
+import { GAME_DIFFICULTY_RULES, GAME_MODE_RULES, type GameDifficulty, type GameMode, type GamePuzzleId, type NormalizedPoint, type ReportReason, type RewardSummary } from "@spot-battle/shared";
+import { Flag, LogOut, Trophy, WifiOff } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppHeader, BoardPair, PaperScreen, ProgressTrack, RESET_VIEWPORT, Segmented, StageScreen, ZoomControls, type AppTab } from "../features/gallery/components/Gallery";
 import { ArtworkShelf, FeaturedArtwork } from "../features/gallery/components/Exhibition";
@@ -8,7 +8,7 @@ import { LevelAvatar, RewardPanel, titleName } from "../features/gallery/compone
 import { DailyGoal, MyGallery } from "../features/gallery/components/MyGallery";
 import { Wardrobe } from "../features/gallery/components/Wardrobe";
 import { ImageBoard } from "../features/game/components/ImageBoard";
-import { useGameClient } from "../features/game/hooks/use-game-client";
+import { useGameClient, type GameClient } from "../features/game/hooks/use-game-client";
 import { clampViewport, type ImageViewport } from "../features/game/model/image-geometry";
 import { SoloGame } from "../features/solo/components/SoloGame";
 
@@ -45,6 +45,34 @@ const DIFFICULTY_DESCRIPTIONS: Record<GameDifficulty, string> = {
 
 export default function App() {
   const game = useGameClient();
+  const reward = game.rankingRewards[0]?.ranking;
+  return <>
+    <Screens game={game}/>
+    {reward && <RankingRewardDialog reward={reward} coins={game.rankingRewards[0]!.coins} onClose={game.dismissRankingReward}/>}
+  </>;
+}
+
+/** 지난주 솔로 랭킹 보상 알림. 접속했을 때 한 번 보여준다. */
+function RankingRewardDialog({ reward, coins, onClose }: { reward: NonNullable<RewardSummary["ranking"]>; coins: number; onClose: () => void }) {
+  const catalog = usePuzzleCatalog();
+  const title = catalog.find((visual) => visual.mode === "solo" && visual.id === reward.puzzleId)?.title ?? "솔로";
+  return <div className="ranking-reward" role="dialog" aria-modal="true" aria-labelledby="ranking-reward-title">
+    <section data-testid="ranking-reward" className="panel fade-up">
+      <span className="reward-trophy"><Trophy size={30} aria-hidden/></span>
+      <p className="eyebrow mt-4">지난주 솔로 랭킹</p>
+      <h2 id="ranking-reward-title" className="mt-1 text-xl font-extrabold">{reward.label} 보상이 도착했어요</h2>
+      <p className="muted mt-2 text-[14px]">{title} · {reward.rank}위</p>
+      <div className="reward-rows mt-4 text-left">
+        <div className="list-row"><span className="inline-flex items-center gap-2"><i className="coin-dot" aria-hidden/>코인</span><b>+{coins}</b></div>
+        <div className="list-row"><span>칭호</span><b>{titleName(reward.titleId)}{reward.newTitle ? " · 새로 받음" : ""}</b></div>
+      </div>
+      {reward.newTitle && <p className="muted mt-3 text-[12px]">꾸미기 › 칭호에서 달 수 있어요.</p>}
+      <button type="button" autoFocus onClick={onClose} className="btn-primary mt-5 w-full">확인</button>
+    </section>
+  </div>;
+}
+
+function Screens({ game }: { game: GameClient }) {
   const [tab, setTab] = useState<AppTab>("HOME");
   const [originalNoticeCount, setOriginalNoticeCount] = useState(0);
   const [nicknameInput, setNicknameInput] = useState(game.nickname);
@@ -134,7 +162,7 @@ export default function App() {
 
   if (tab === "ME" && game.phase === "LOBBY") return <MyGallery nickname={game.nickname} growth={game.growth} onTab={switchTab}/>;
 
-  if (tab === "SOLO") return <SoloGame nickname={game.nickname} growth={game.growth} soloResult={game.soloResult} onComplete={game.completeSolo} onTab={switchTab}/>;
+  if (tab === "SOLO") return <SoloGame client={game} onTab={switchTab}/>;
 
   if (game.phase === "LOBBY") return <PaperScreen ambientSrc={featured.originalSrc}>
     <div className="has-tabbar">

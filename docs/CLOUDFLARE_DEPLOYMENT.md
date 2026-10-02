@@ -7,7 +7,7 @@ main에 머지하면 Cloudflare Workers Git 연동으로 자동 빌드·배포�
 
 ## 구성
 
-- 웹: game Worker의 Static Assets. 솔로는 브라우저에서 실행한다.
+- 웹: game Worker의 Static Assets. 솔로 판정과 랭킹도 game Worker(Durable Object)가 맡는다.
 - 대전: `/ws`의 native WebSocket과 `GameLobby` Durable Object. 기존 `GameMatch`의 정답 판정·게임 규칙을 재사용한다.
 - 경기 상태·게스트 세션: Durable Object SQLite 저장소. 응답 전에 상태를 저장하고, hibernation 뒤 복원한다.
 - 이미지: `PUZZLE_CATALOG_SOURCE="code"`(현재 기본)면 웹 번들 그림을, `"database"`면 R2 전달 Worker(`PUZZLE_ASSET_BASE_URL`)의 그림을 쓴다. 그림 목록은 `/catalog`로 제공한다.

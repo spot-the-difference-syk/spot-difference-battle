@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { GameSnapshot, MatchFoundPayload, PlayerGrowthPayload } from "@spot-battle/shared";
+import type { GameSnapshot, MatchFoundPayload, PlayerGrowthPayload, RankingPayload, SoloGuessResultPayload, SoloStartedPayload } from "@spot-battle/shared";
 import { GAME_PUZZLES } from "../../../apps/server/src/game/puzzle-catalog.js";
+import { BUNDLED_SOLO_ANSWERS } from "../../../apps/server/src/game/solo-puzzles.js";
 import { RealtimeGame, tokenHash, type Archive, type GrowthBackup, type Peer, type Storage } from "../src/game.js";
 import { readFileSync } from "node:fs";
 import { allowedOrigin } from "../src/index.js";
@@ -41,7 +42,18 @@ async function harness(archive?: Archive, catalog = [GAME_PUZZLES[0]!]) {
     now += 3000; await game.alarm();
     return { first, second };
   };
-  return { storage, peers, add, snapshot, token, action, join, start, get game() { return game; }, get now() { return now; }, advance(ms: number) { now += ms; }, async restore() { game = new RealtimeGame(storage, () => peers, catalog, archive, () => now); await game.restore(); }, async disconnect(p: TestPeer) { p.close(); await game.disconnect(p); } };
+  /** 서버 판정으로 솔로 한 판을 끝낸다. 걸린 시간 = 3초 대기 후 extraMs + 정답마다 150ms */
+  const playSolo = async (p: TestPeer, puzzleId = "observatory", extraMs = 0) => {
+    await game.action(p, "solo:start", { puzzleId, nickname: "테스터" });
+    const started = p.frames.filter((f) => f.event === "solo:started").at(-1)!.payload as SoloStartedPayload;
+    now += 3000 + extraMs;
+    for (const answer of BUNDLED_SOLO_ANSWERS.find((puzzle) => puzzle.id === puzzleId)!.answers) {
+      now += 150;
+      await game.action(p, "solo:guess", { runId: started.runId, point: { x: answer.region.x, y: answer.region.y } });
+    }
+    return p.frames.filter((f) => f.event === "solo:guess-result").at(-1)!.payload as SoloGuessResultPayload;
+  };
+  return { storage, peers, add, snapshot, token, action, join, start, playSolo, get game() { return game; }, get now() { return now; }, advance(ms: number) { now += ms; }, async restore() { game = new RealtimeGame(storage, () => peers, catalog, archive, () => now); await game.restore(); }, async disconnect(p: TestPeer) { p.close(); await game.disconnect(p); } };
 }
 
 describe("Cloudflare authoritative game", () => {
@@ -189,12 +201,62 @@ describe("Cloudflare authoritative game", () => {
   });
   it("rewards solo completions up to the daily limit", async () => {
     const h = await harness(); const player = await h.add();
-    for (let i = 0; i < 6; i += 1) await h.game.action(player, "solo:complete", { puzzleId: "observatory", elapsedMs: 40_000 });
-    await h.game.action(player, "solo:complete", { puzzleId: "observatory", elapsedMs: 500 });
+    for (let i = 0; i < 6; i += 1) await h.playSolo(player, "observatory", 40_000);
+    // 3초 안에 다 찾은 기록은 보상·순위 없이 끝난다.
+    const tooFast = await h.playSolo(player, "observatory");
+    expect(tooFast.finished).toMatchObject({ elapsedMs: 750, newPersonalBest: false, weekRank: null, allRank: null });
     const payloads = player.frames.filter((f) => f.event === "player:growth").map((f) => f.payload as PlayerGrowthPayload);
     expect(payloads.filter((p) => p.reward)).toHaveLength(5);
     expect(payloads.at(-2)!.soloLimitReached).toBe(true);
     expect(payloads.at(-1)!.progress).toMatchObject({ totalXp: 150, coins: 100 });
+  });
+  it("ranks server-timed solo runs and pays the weekly reward once after Monday", async () => {
+    const h = await harness();
+    const players = [];
+    for (let i = 0; i < 5; i += 1) {
+      const player = await h.add();
+      const done = await h.playSolo(player, "observatory", 10_000 - i * 1_000);
+      expect(done.finished).toMatchObject({ newPersonalBest: true, weekRank: 1, allRank: 1 });
+      players.push(player);
+    }
+    // 기록은 서버가 잰다: 클라이언트가 보낸 시간 값은 받지 않는다.
+    await h.game.action(players[0]!, "ranking:get", { puzzleId: "observatory", period: "week" });
+    const week = players[0]!.frames.filter((f) => f.event === "ranking:list").at(-1)!.payload as RankingPayload;
+    expect(week).toMatchObject({ period: "week", participants: 5, me: { rank: 5, elapsedMs: 10_750 } });
+    expect(week.rows.map((row) => row.elapsedMs)).toEqual([6_750, 7_750, 8_750, 9_750, 10_750]);
+    expect(week.rows[4]).toMatchObject({ me: true, nickname: "테스터", avatar: "avatar-initial" });
+    // 같은 그림을 더 느리게 다시 해도 순위표의 내 기록은 그대로다.
+    const slower = await h.playSolo(players[4]!, "observatory", 30_000);
+    expect(slower.finished).toMatchObject({ newPersonalBest: false, weekRank: 1, allRank: 1 });
+
+    h.advance(8 * 86_400_000);
+    await h.restore();
+    await h.add();
+    const rankingRewards = (p: TestPeer) => p.frames.map((f) => f.payload as PlayerGrowthPayload).filter((g) => g?.reward?.reason === "RANKING");
+    expect(rankingRewards(players[4]!)).toHaveLength(1);
+    expect(rankingRewards(players[4]!)[0]!.reward).toMatchObject({ coins: 600, ranking: { rank: 1, titleId: "title-weekly-champion", newTitle: true } });
+    expect(rankingRewards(players[4]!)[0]!.progress.ownedItemIds).toContain("title-weekly-champion");
+    expect(rankingRewards(players[3]!)[0]!.reward).toMatchObject({ coins: 300, ranking: { rank: 2, titleId: "title-weekly-top" } });
+    expect(rankingRewards(players[1]!)).toHaveLength(0);
+    // 정산은 한 번뿐이고, 새 주의 주간 순위표는 비어 있다. 전체 순위는 남는다.
+    await h.restore();
+    await h.add();
+    expect(rankingRewards(players[4]!)).toHaveLength(1);
+    await h.game.action(players[0]!, "ranking:get", { puzzleId: "observatory", period: "week" });
+    expect((players[0]!.frames.at(-1)!.payload as RankingPayload).participants).toBe(0);
+    await h.game.action(players[0]!, "ranking:get", { puzzleId: "observatory", period: "all" });
+    expect((players[0]!.frames.at(-1)!.payload as RankingPayload)).toMatchObject({ participants: 5, me: { rank: 5 } });
+  });
+  it("rejects solo guesses for another run and solo starts for unknown puzzles", async () => {
+    const h = await harness(); const player = await h.add();
+    await h.game.action(player, "solo:start", { puzzleId: "nope", nickname: "테스터" });
+    expect(player.frames.at(-1)).toMatchObject({ event: "game:error", payload: { code: "PUZZLE_NOT_FOUND" } });
+    await h.game.action(player, "solo:start", { puzzleId: "observatory", nickname: "테스터" });
+    await h.game.action(player, "solo:guess", { runId: "forged", point: { x: 0.5, y: 0.5 } });
+    expect(player.frames.at(-1)).toMatchObject({ event: "game:error", payload: { code: "SOLO_NOT_FOUND" } });
+    const runId = (player.frames.find((f) => f.event === "solo:started")!.payload as SoloStartedPayload).runId;
+    await h.game.action(player, "solo:guess", { runId, point: { x: 0.5, y: 0.5 } });
+    expect(player.frames.at(-1)).toMatchObject({ event: "game:error", payload: { code: "SOLO_NOT_STARTED" } });
   });
   it("sells and equips cosmetics with server-side coin checks and shows them to the opponent", async () => {
     const h = await harness();
@@ -220,8 +282,9 @@ describe("Cloudflare authoritative game", () => {
   it("publishes the catalog without battle answers and sends each match its deck", async () => {
     const h = await harness();
     const payload = await h.game.catalogPayload();
-    expect(payload.puzzles.some((card) => card.mode === "solo" && card.answers?.length === 5)).toBe(true);
-    expect(payload.puzzles.filter((card) => card.mode === "battle").every((card) => card.answers === undefined)).toBe(true);
+    expect(payload.puzzles.some((card) => card.mode === "solo")).toBe(true);
+    // 솔로 정답도 이제 서버만 안다(랭킹 기록을 서버가 재므로).
+    expect(JSON.stringify(payload.puzzles)).not.toContain('"answers"');
     const { first } = await h.start();
     const found = first.frames.find((f) => f.event === "match:found")!.payload as MatchFoundPayload;
     expect(found.deck?.map((card) => card.id)).toEqual([GAME_PUZZLES[0]!.id]);
@@ -250,16 +313,19 @@ describe("Cloudflare authoritative game", () => {
       };
       return { rows, state, archive };
     }
-    const solo = (h: Awaited<ReturnType<typeof harness>>, peer: TestPeer) => h.game.action(peer, "solo:complete", { puzzleId: "observatory", elapsedMs: 40_000 });
+    const solo = (h: Awaited<ReturnType<typeof harness>>, peer: TestPeer) => h.playSolo(peer, "observatory", 3_000);
     const lastGrowth = (peer: TestPeer) => peer.frames.filter((f) => f.event === "player:growth").at(-1)!.payload as PlayerGrowthPayload;
 
     it("backs up changed growth in batches with a token hash, and retries after a failure", async () => {
       const db = backupArchive(); const h = await harness(db.archive);
       const a = await h.add(); const b = await h.add();
-      await solo(h, a); await solo(h, b); await solo(h, a);
-      expect(h.storage.alarm).toBe(1_000_000 + 10_000);
+      await solo(h, a); const firstChange = h.now;
+      await solo(h, b);
+      expect(h.storage.alarm).toBe(firstChange + 10_000);
       await h.game.alarm();
       expect(db.state.saves).toBe(0);
+      // 백업 전에 또 바뀐 기록은 같은 묶음으로 올라간다.
+      await solo(h, a);
       h.advance(10_000); await h.game.alarm();
       expect(db.state.saves).toBe(1);
       expect(db.rows.get(a.playerId!)!.growth).toMatchObject({ totalXp: 60, coins: 40 });

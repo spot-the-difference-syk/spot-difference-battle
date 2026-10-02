@@ -8,6 +8,7 @@ import {
   buyCosmetic,
   emptyGrowth,
   equipCosmetic,
+  grantRankingReward,
   grantSoloReward,
   growthView,
   matchJourney,
@@ -17,7 +18,9 @@ import {
   type MatchSettings,
   type PlayerGrowth,
   type PlayerGrowthPayload,
+  type PublicCosmetics,
   type ServerToClientEvents,
+  type SoloRun,
 } from "@spot-battle/shared";
 import Fastify, { type FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
@@ -31,6 +34,7 @@ import { InMemoryMatchStore, type MatchStore } from "./persistence/match-store.j
 import { operationalLogFields } from "./observability/operational-logging.js";
 import { GAME_PUZZLES } from "./game/puzzle-catalog.js";
 import { CatalogService, codeCatalog } from "./game/catalog-service.js";
+import { SoloLeague } from "./game/solo-league.js";
 
 export interface GameServerOptions {
   webOrigin?: string | RegExp;
@@ -49,6 +53,8 @@ export interface GameServerOptions {
   catalog?: CatalogService;
   /** 통합 테스트 등에서 특정 장면으로 매칭을 고정한다. */
   sceneId?: string;
+  /** 솔로 판의 시계. 통합 테스트에서 카운트다운을 기다리지 않으려고 바꾼다. */
+  soloClock?: () => number;
 }
 
 interface SocketData {
@@ -141,6 +147,10 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
   const guestSessionCleanupIntervalMs = options.guestSessionCleanupIntervalMs ?? 60 * 1_000;
   const sessions = new GuestSessionRegistry(guestSessionRetentionMs);
   const growthByPlayer = new Map<string, PlayerGrowth>();
+  // 로컬 개발 서버의 솔로 랭킹은 메모리에만 둔다. 운영 Worker는 Durable Object에 저장한다.
+  const soloClock = options.soloClock ?? Date.now;
+  const league = new SoloLeague(catalogService, undefined, soloClock);
+  const soloRuns = new Map<string, SoloRun>();
   /** 레벨·코인이 있는 게스트는 오래 보존한다. */
   const growthRetentionMs = 180 * 24 * 60 * 60 * 1_000;
   const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -205,6 +215,27 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
 
   function growthPayload(playerId: string, extra: Omit<PlayerGrowthPayload, "progress"> = {}): PlayerGrowthPayload {
     return { progress: growthView(growthOf(playerId)), ...extra };
+  }
+
+  /** 지난주 솔로 랭킹 보상을 한 번만 나눠 준다. 접속 중이면 바로 알린다. */
+  function settleRanking(): void {
+    for (const grant of league.settle()) {
+      if (growthByPlayer.has(grant.playerId)) giveRankingReward(grant.playerId, [grant]);
+      else league.hold(grant);
+    }
+  }
+
+  function giveRankingReward(playerId: string, grants: ReturnType<SoloLeague["takePending"]>): void {
+    for (const grant of grants) {
+      const granted = grantRankingReward(growthOf(playerId), grant, Date.now());
+      if (!granted) continue;
+      storeGrowth(playerId, granted.progress);
+      io.to(playerId).emit("player:growth", growthPayload(playerId, { reward: granted.reward }));
+    }
+  }
+
+  function onlineCosmetics(): Map<string, PublicCosmetics> {
+    return new Map([...growthByPlayer].map(([id, growth]) => [id, publicCosmetics(growth.loadout)]));
   }
 
   function opponentCosmetics(opponentId: string | undefined) {
@@ -465,6 +496,8 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
       playerId: session.playerId,
     });
     socket.emit("player:growth", growthPayload(session.playerId));
+    settleRanking();
+    giveRankingReward(session.playerId, league.takePending(session.playerId));
     resumeMatch(socket, session);
 
     socket.on("queue:join", (payload) => {
@@ -668,20 +701,71 @@ export async function createGameServer(options: GameServerOptions): Promise<Fast
         }
       }
     });
-    socket.on("solo:complete", (payload) => {
+    socket.on("solo:start", (payload) => {
+      try {
+        const nickname = requireStringField(payload, "nickname").trim().slice(0, 16);
+        if (nickname.length < 2) throw new GameRuleError("INVALID_NICKNAME", "닉네임은 2자 이상이어야 합니다.");
+        enforceCooldown("solo-start");
+        session.nickname = nickname;
+        persistGuest(session);
+        settleRanking();
+        const started = league.start(requireStringField(payload, "puzzleId"), randomUUID());
+        soloRuns.set(session.playerId, started.run);
+        socket.emit("solo:started", started.payload);
+      } catch (error) {
+        emitGameError(socket, error);
+      }
+    });
+
+    socket.on("solo:guess", (payload) => {
       try {
         const input = requirePayload(payload);
-        if (typeof input.puzzleId !== "string" || typeof input.elapsedMs !== "number") {
-          throw new GameRuleError("INVALID_PAYLOAD", "솔로 기록 형식이 올바르지 않습니다.");
+        const runId = requireStringField(payload, "runId");
+        const guessed = league.guess(soloRuns.get(session.playerId), runId, {
+          point: input.point as never,
+          pointerType: typeof input.pointerType === "string" ? input.pointerType : undefined,
+          boardSizePx: typeof input.boardSizePx === "number" ? input.boardSizePx : undefined,
+        });
+        if (!guessed.finish) {
+          soloRuns.set(session.playerId, guessed.run);
+          socket.emit("solo:guess-result", guessed.payload);
+          return;
         }
-        enforceCooldown("solo");
+        soloRuns.delete(session.playerId);
+        const { puzzleId, elapsedMs } = guessed.finish;
         const before = growthOf(session.playerId);
-        const soloId = catalogService.isSoloPuzzle(input.puzzleId) ? input.puzzleId : undefined;
-        const result = grantSoloReward(before, input.elapsedMs, Date.now(), soloId);
+        const result = grantSoloReward(before, elapsedMs, soloClock(), puzzleId);
         if (result.progress !== before) storeGrowth(session.playerId, result.progress);
+        const ranks = league.record({ playerId: session.playerId, nickname: session.nickname ?? "손님", ...publicCosmetics(result.progress.loadout) }, guessed.finish);
+        socket.emit("solo:guess-result", {
+          ...guessed.payload,
+          finished: {
+            elapsedMs,
+            personalBestMs: result.progress.soloBests[puzzleId] ?? elapsedMs,
+            newPersonalBest: result.progress.soloBests[puzzleId] !== before.soloBests[puzzleId],
+            ...ranks,
+          },
+        });
         socket.emit("player:growth", growthPayload(session.playerId, {
           ...(result.reward ? { reward: result.reward } : {}),
           ...(result.limitReached ? { soloLimitReached: true } : {}),
+        }));
+      } catch (error) {
+        emitGameError(socket, error);
+      }
+    });
+
+    socket.on("ranking:get", (payload) => {
+      try {
+        const puzzleId = requireStringField(payload, "puzzleId");
+        const period = requireStringField(payload, "period");
+        if (period !== "week" && period !== "all") throw new GameRuleError("INVALID_PAYLOAD", "랭킹 기간이 올바르지 않습니다.");
+        enforceCooldown("ranking");
+        settleRanking();
+        socket.emit("ranking:list", league.ranking(puzzleId, period, {
+          playerId: session.playerId,
+          personalBestMs: growthOf(session.playerId).soloBests[puzzleId] ?? null,
+          cosmetics: onlineCosmetics(),
         }));
       } catch (error) {
         emitGameError(socket, error);

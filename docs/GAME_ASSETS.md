@@ -1,14 +1,14 @@
 # 그림 에셋 가이드
 
 > 문서 상태: CURRENT
-> 기준일: 2026-10-01
+> 기준일: 2026-10-02
 
 ## 1. 에셋 모델
 
 게임 콘텐츠 단위는 `원본 + 수정본 + 정답 영역`으로 구성된 그림 한 쌍이다. 대결 그림은 정답 3개, 솔로 그림은 5개다. 경기 중 플레이어가 이미지를 수정하지 않는다.
 
 - **운영 방식**: 새 그림은 코드 수정·재배포 없이 **R2(이미지) + Supabase `puzzle_catalog`(정답·노출 여부)** 로 추가한다. 절차는 아래 7절을 따른다.
-- **앱 번들 그림**: 앱에 들어 있는 15점(대결 10, 솔로 5)은 기본 목록이자 서버·DB에 닿지 못할 때의 대체 목록이다. 기준 파일은 대결 `packages/shared/src/puzzles/asset-manifest.ts`, 솔로 `apps/web/src/features/solo/puzzles/manifest.ts`이며, 이미지는 `apps/web/src/assets/puzzles/`에 있다. 번들 이미지를 바꿀 때는 같은 이름으로 덮어쓰지 말고 버전과 해시를 함께 올린다.
+- **앱 번들 그림**: 앱에 들어 있는 15점(대결 10, 솔로 5)은 기본 목록이자 서버·DB에 닿지 못할 때의 대체 목록이다. 기준 파일은 대결 `packages/shared/src/puzzles/asset-manifest.ts`, 솔로 `apps/web/src/features/solo/puzzles/manifest.ts`(이미지)와 `apps/server/src/game/solo-puzzles.ts`(정답)이며, 이미지는 `apps/web/src/assets/puzzles/`에 있다. 번들 이미지를 바꿀 때는 같은 이름으로 덮어쓰지 말고 버전과 해시를 함께 올린다.
 
 권리 상태 `USER_SUPPLIED`는 사용자가 직접 제작·제공했다는 기록이지 제3자 법률 검증을 뜻하지 않는다.
 
@@ -63,7 +63,7 @@
 - 이미지: R2 `puzzles/{id}/{version}/runtime/{original|modified}.webp` (1024×1024 WebP). 버전이 경로에 들어가므로 한 번 올린 주소의 내용은 바뀌지 않는다.
 - 정답·제목·화풍·노출 여부: Supabase `puzzle_catalog` 행. `metadata`에 `{mode, genre, alt, original_sha256, modified_sha256}`를 둔다.
 - 서버는 활성 행을 5분마다 다시 읽는다(`GET /catalog`). 실패하면 마지막 정상 목록을 계속 쓴다. 웹은 10분마다 `/catalog`를 읽고, 실패하면 번들 그림으로 진행한다.
-- 대결 정답은 서버에만 있고 브라우저로 보내지 않는다. 솔로는 브라우저가 판정하므로 정답이 `/catalog`에 포함된다.
+- 정답은 대결·솔로 모두 서버에만 있고 브라우저로 보내지 않는다. 솔로 기록이 랭킹에 오르므로 솔로도 서버가 판정한다.
 - 경기마다 활성 대결 그림 중 10점을 무작위로 뽑는다.
 - R2 배포 Worker는 올라간 키라면 무엇이든 제공한다. 비활성 그림도 주소를 알면 받을 수 있으므로 공개 전 비밀이 필요한 그림은 올리지 않는다.
 

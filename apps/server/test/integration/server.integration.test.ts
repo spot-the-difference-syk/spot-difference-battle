@@ -1,6 +1,7 @@
 import { GameMatch } from "@spot-battle/game-core";
 import { GAME_PUZZLES } from "../../src/game/puzzle-catalog.js";
-import type { CatalogPayload, ClientToServerEvents, GameErrorPayload, GameSnapshot, MatchFoundPayload, PlayerGrowthPayload, ServerToClientEvents } from "@spot-battle/shared";
+import type { CatalogPayload, ClientToServerEvents, GameErrorPayload, GameSnapshot, MatchFoundPayload, PlayerGrowthPayload, RankingPayload, ServerToClientEvents, SoloGuessResultPayload, SoloStartedPayload } from "@spot-battle/shared";
+import { BUNDLED_SOLO_ANSWERS } from "../../src/game/solo-puzzles.js";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { io as createClient, type Socket } from "socket.io-client";
@@ -195,21 +196,49 @@ describe("simultaneous game server", () => {
     await expect(found).resolves.toMatchObject({ opponentCosmetics: { profile: "profile-none", title: "title-visitor" } });
   });
 
-  it("syncs growth on connect and rewards solo completions within the daily limit", async () => {
+  it("judges solo runs on the server, rewards them and ranks the server-timed record", async () => {
+    await app.close();
+    let now = 1_000_000;
+    app = await createGameServer({ inputCooldownMs: 0, soloClock: () => now });
+    await app.listen({ host: "127.0.0.1", port: 0 });
     const { port } = app.server.address() as AddressInfo;
     const socket: TestSocket = createClient(`http://127.0.0.1:${port}`, { forceNew: true, transports: ["websocket"], autoConnect: false });
     sockets.push(socket);
     const initial = waitForEvent<PlayerGrowthPayload>(socket, "player:growth");
     socket.connect();
     await expect(initial).resolves.toMatchObject({ progress: { level: 1, totalXp: 0, coins: 0 } });
+
+    const play = async (waitMs: number) => {
+      const started = waitForEvent<SoloStartedPayload>(socket, "solo:started");
+      socket.emit("solo:start", { puzzleId: "observatory", nickname: "솔로" });
+      const { runId, startsAtMs } = await started;
+      expect(startsAtMs).toBe(now + 3_000);
+      now += 3_000 + waitMs;
+      const wrong = waitForEvent<SoloGuessResultPayload>(socket, "solo:guess-result");
+      socket.emit("solo:guess", { runId, point: { x: 0.01, y: 0.01 } });
+      await expect(wrong).resolves.toMatchObject({ correct: false, wrongCount: 1 });
+      let last: SoloGuessResultPayload | undefined;
+      for (const answer of BUNDLED_SOLO_ANSWERS.find((puzzle) => puzzle.id === "observatory")!.answers) {
+        now += 200;
+        const result = waitForEvent<SoloGuessResultPayload>(socket, "solo:guess-result");
+        socket.emit("solo:guess", { runId, point: { x: answer.region.x, y: answer.region.y } });
+        last = await result;
+        expect(last).toMatchObject({ correct: true, mark: { differenceId: answer.id } });
+      }
+      return last!;
+    };
+
     const rewarded = waitForEvent<PlayerGrowthPayload>(socket, "player:growth", (payload) => Boolean(payload.reward));
-    socket.emit("solo:complete", { puzzleId: "observatory", elapsedMs: 41_000 });
-    await expect(rewarded).resolves.toMatchObject({ reward: { reason: "SOLO", xp: 30, coins: 20 }, progress: { totalXp: 30, coins: 20 } });
-    const rejected = waitForEvent<PlayerGrowthPayload>(socket, "player:growth");
-    socket.emit("solo:complete", { puzzleId: "observatory", elapsedMs: 10 });
-    const tooFast = await rejected;
-    expect(tooFast.reward).toBeUndefined();
-    expect(tooFast.progress.totalXp).toBe(30);
+    // 오답 1번 = 3초 페널티. 걸린 시간은 서버가 잰다.
+    await expect(play(10_000)).resolves.toMatchObject({ finished: { elapsedMs: 14_000, personalBestMs: 14_000, newPersonalBest: true, weekRank: 1, allRank: 1 } });
+    await expect(rewarded).resolves.toMatchObject({ reward: { reason: "SOLO", xp: 30, coins: 20 }, progress: { totalXp: 30, coins: 20, soloBests: { observatory: 14_000 } } });
+
+    const ranking = waitForEvent<RankingPayload>(socket, "ranking:list");
+    socket.emit("ranking:get", { puzzleId: "observatory", period: "week" });
+    await expect(ranking).resolves.toMatchObject({ participants: 1, rows: [{ rank: 1, nickname: "솔로", elapsedMs: 14_000, me: true }], me: { rank: 1, elapsedMs: 14_000 } });
+
+    const slower = await play(20_000);
+    expect(slower.finished).toMatchObject({ personalBestMs: 14_000, newPersonalBest: false });
   });
 
   it("keeps private progress scoped to each client and emits one authoritative result", async () => {

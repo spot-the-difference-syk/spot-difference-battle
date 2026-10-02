@@ -397,6 +397,8 @@ export async function setActive(id, version, { env, log, validator, dbFactory })
 export async function exportBundled(outDir, { log }) {
   const shared = await import(path.join(ROOT, "packages/shared/dist/index.js"));
   const { GAME_PUZZLES } = await import(path.join(ROOT, "apps/server/src/game/puzzle-catalog.ts"));
+  // 솔로 정답은 서버 코드에만 있다(웹 번들에는 싣지 않는다).
+  const { BUNDLED_SOLO_ANSWERS } = await import(path.join(ROOT, "apps/server/src/game/solo-puzzles.ts"));
   const assets = path.join(ROOT, "apps/web/src/assets/puzzles");
   const write = async (id, meta, files) => {
     const dir = path.join(outDir, `${meta.mode}-${id}`);
@@ -417,7 +419,7 @@ export async function exportBundled(outDir, { log }) {
     await write(puzzle.id, {
       mode: "solo", title: puzzle.title, genre: puzzle.genre, alt: puzzle.alt,
       source: { bundledVersion: puzzle.version },
-      differences: puzzle.answers.map((answer) => ({ id: answer.id, label: answer.label, regions: [answer.region, ...(answer.extraRegions ?? [])] })),
+      differences: BUNDLED_SOLO_ANSWERS.find((solo) => solo.id === puzzle.id).answers.map((answer) => ({ id: answer.id, label: answer.label, regions: [answer.region, ...(answer.extraRegions ?? [])] })),
     }, { original: path.join(assets, "solo", `${puzzle.id}-original.webp`), modified: path.join(assets, "solo", `${puzzle.id}-modified.webp`) });
   }
   const total = GAME_PUZZLES.length + shared.BUNDLED_SOLO_PUZZLES.length;

@@ -48,13 +48,46 @@ export {
   type ReportResultPayload,
   type ServerToClientEvents,
   type SessionReadyPayload,
+  type SoloGuessResultPayload,
+  type SoloStartedPayload,
 } from "./protocol/socket-events.js";
+
+export {
+  SOLO_RULES,
+  findSoloAnswer,
+  guessSoloRun,
+  minimumSoloHitRadius,
+  soloElapsedMs,
+  soloRegions,
+  startSoloRun,
+  type SoloGuessInput,
+  type SoloGuessOutcome,
+  type SoloRun,
+} from "./game/solo.js";
+
+export {
+  RANKING_RULES,
+  WEEKLY_RANK_REWARDS,
+  koreanWeekKey,
+  previousWeekKey,
+  rankOf,
+  rankingPayload,
+  submitRecord,
+  weeklyRewards,
+  type RankEntry,
+  type RankRow,
+  type RankingPayload,
+  type RankingPeriod,
+  type WeeklyRewardGrant,
+  type WeeklyRewardTier,
+} from "./game/leaderboard.js";
 
 export {
   DAILY_GOALS,
   PROGRESSION_RULES,
   dailyGoalFor,
   emptyGrowth,
+  grantRankingReward,
   grantSoloReward,
   growthView,
   koreanDay,

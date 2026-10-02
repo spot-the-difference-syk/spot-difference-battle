@@ -14,13 +14,15 @@ import { LevelAvatar, titleName } from "./Growth";
 
 const SLOT_OPTIONS = [["marker", "정답 표시"], ["frame", "액자"], ["avatar", "프로필 그림"], ["profile", "테두리"], ["title", "칭호"]] as const;
 const PREVIEW = SOLO_PUZZLE_BY_ID.bakery;
-const PREVIEW_MARK = PREVIEW.differences[0]!.region;
+/** 미리보기 그림 위 정답 표시 자리(벽시계) */
+const PREVIEW_MARK = { x: 0.72, y: 0.31, radius: 0.04 };
 
-type ItemState = "EQUIPPED" | "OWNED" | "LOCKED" | "BUYABLE" | "TOO_EXPENSIVE";
+type ItemState = "EQUIPPED" | "OWNED" | "REWARD" | "LOCKED" | "BUYABLE" | "TOO_EXPENSIVE";
 
 function itemState(entry: CosmeticItem, growth: GrowthView): ItemState {
   if (growth.loadout[entry.slot] === entry.id) return "EQUIPPED";
   if (growth.ownedItemIds.includes(entry.id)) return "OWNED";
+  if (entry.rewardOnly) return "REWARD";
   if (growth.level < entry.minLevel) return "LOCKED";
   return growth.coins >= entry.price ? "BUYABLE" : "TOO_EXPENSIVE";
 }
@@ -28,6 +30,7 @@ function itemState(entry: CosmeticItem, growth: GrowthView): ItemState {
 function statusText(entry: CosmeticItem, state: ItemState): string {
   if (state === "EQUIPPED") return "사용 중";
   if (state === "OWNED") return "보유";
+  if (state === "REWARD") return "랭킹 보상";
   if (state === "LOCKED") return `레벨 ${entry.minLevel}`;
   return `${entry.price.toLocaleString("ko-KR")}코인`;
 }
@@ -86,9 +89,9 @@ export function Wardrobe({ nickname, growth, error, onTab, onBuy, onEquip }: {
             {items.map((entry) => {
               const entryState = itemState(entry, growth);
               return <button key={entry.id} type="button" className="item-card" aria-pressed={visibleSelected.id === entry.id} onClick={() => setSelectedId(entry.id)}>
-                <Swatch entry={entry} nickname={nickname} locked={entryState === "LOCKED"}/>
+                <Swatch entry={entry} nickname={nickname} locked={entryState === "LOCKED" || entryState === "REWARD"}/>
                 <span className="item-name">{entry.name}</span>
-                <span className={`item-status ${entryState === "EQUIPPED" ? "equipped" : ""}`}>{entryState !== "EQUIPPED" && entryState !== "OWNED" && entryState !== "LOCKED" && <i className="coin-dot" style={{ width: 10, height: 10 }}/>}{statusText(entry, entryState)}</span>
+                <span className={`item-status ${entryState === "EQUIPPED" ? "equipped" : ""}`}>{entryState !== "EQUIPPED" && entryState !== "OWNED" && entryState !== "LOCKED" && entryState !== "REWARD" && <i className="coin-dot" style={{ width: 10, height: 10 }}/>}{statusText(entry, entryState)}</span>
               </button>;
             })}
           </div>
@@ -100,6 +103,7 @@ export function Wardrobe({ nickname, growth, error, onTab, onBuy, onEquip }: {
             {state === "OWNED" && <button data-testid="item-equip" type="button" className="btn-primary" onClick={() => onEquip(visibleSelected.id)}>사용하기</button>}
             {state === "BUYABLE" && <button data-testid="item-buy" type="button" className="btn-primary" onClick={() => onBuy(visibleSelected.id)}>{visibleSelected.price.toLocaleString("ko-KR")}코인으로 구매하고 사용하기</button>}
             {state === "TOO_EXPENSIVE" && <button type="button" className="btn-primary" disabled>코인이 {(visibleSelected.price - growth.coins).toLocaleString("ko-KR")}개 부족해요</button>}
+            {state === "REWARD" && <button type="button" className="btn-primary" disabled>솔로 주간 랭킹에서 받을 수 있어요</button>}
             {state === "LOCKED" && <button type="button" className="btn-primary" disabled>레벨 {visibleSelected.minLevel}부터 쓸 수 있어요</button>}
           </div>
         </>}
