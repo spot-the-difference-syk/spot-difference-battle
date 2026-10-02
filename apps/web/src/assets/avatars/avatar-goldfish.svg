@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><defs><radialGradient id="gf-bg" cx=".4" cy=".3" r=".9"><stop offset="0" stop-color="#fff4e2"/><stop offset="1" stop-color="#f2d2a8"/></radialGradient>
+<radialGradient id="gf-water" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#bfe9ff"/><stop offset="1" stop-color="#5bb4e6"/></radialGradient>
+<linearGradient id="gf-fish" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb347"/><stop offset="1" stop-color="#ff5a2a"/></linearGradient>
+<clipPath id="gf-clip"><path d="M64 26c26 0 44 18 44 42s-18 42-44 42-44-18-44-42 18-42 44-42Z"/></clipPath></defs>
+<style>.sw{animation:sw 5s ease-in-out infinite alternate}@keyframes sw{from{transform:translate(-8px,2px)}to{transform:translate(10px,-4px)}}.tail{animation:tail .5s ease-in-out infinite alternate;transform-origin:52px 70px}@keyframes tail{to{transform:scaleY(.7)}}.bb{animation:bb 3s linear infinite}@keyframes bb{to{transform:translateY(-58px);opacity:0}}@media (prefers-reduced-motion: reduce){*{animation:none!important}}</style>
+<rect width="128" height="128" fill="url(#gf-bg)"/>
+<ellipse cx="64" cy="114" rx="40" ry="6" fill="#c9a77f" opacity=".5"/>
+<g clip-path="url(#gf-clip)">
+<rect x="0" y="40" width="128" height="88" fill="url(#gf-water)"/>
+<path d="M20 40c14-4 28 4 44 0s30-4 44 0" stroke="#e6f7ff" stroke-width="2.5" fill="none"/>
+<path d="M30 110c6-18 2-30 8-40M38 110c2-12 6-20 4-30" stroke="#3f8f4a" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+<ellipse cx="64" cy="106" rx="40" ry="8" fill="#e8c890"/><circle cx="84" cy="102" r="4" fill="#c9a77f"/><circle cx="92" cy="104" r="3" fill="#a8896a"/>
+<g class="sw"><g class="tail"><path d="M52 70c-10-12-20-12-22-6 4 2 6 4 6 6s-2 4-6 6c2 6 12 6 22-6Z" fill="url(#gf-fish)" opacity=".9"/></g>
+<ellipse cx="66" cy="70" rx="16" ry="11" fill="url(#gf-fish)"/>
+<path d="M62 60c4-6 10-6 12-2M60 80c4 4 8 6 10 4" stroke="#ff8a3a" stroke-width="3" stroke-linecap="round" fill="none"/>
+<circle cx="74" cy="67" r="3" fill="#fff"/><circle cx="75" cy="67" r="1.6" fill="#1b1b1b"/>
+<path d="M62 64c3 3 3 9 0 12" stroke="#ffe0b8" stroke-width="1.4" fill="none" opacity=".8"/></g>
+<circle class="bb" style="animation-delay:-0s" cx="50" cy="96" r="2" fill="none" stroke="#ffffff" stroke-width="1.2" opacity=".85"/><circle class="bb" style="animation-delay:-1.3s" cx="56" cy="96" r="1.5" fill="none" stroke="#ffffff" stroke-width="1.2" opacity=".85"/><circle class="bb" style="animation-delay:-2.4s" cx="80" cy="96" r="2.3" fill="none" stroke="#ffffff" stroke-width="1.2" opacity=".85"/><circle class="bb" style="animation-delay:-0.7s" cx="74" cy="96" r="1.4" fill="none" stroke="#ffffff" stroke-width="1.2" opacity=".85"/>
+</g>
+<path d="M64 26c26 0 44 18 44 42s-18 42-44 42-44-18-44-42 18-42 44-42Z" fill="none" stroke="#ffffff" stroke-width="3" opacity=".8"/>
+<path d="M36 44c6-8 14-12 22-12" stroke="#fff" stroke-width="4" stroke-linecap="round" fill="none" opacity=".75"/>
+<ellipse cx="64" cy="27" rx="24" ry="4" fill="none" stroke="#ffffff" stroke-width="3" opacity=".9"/></svg>
