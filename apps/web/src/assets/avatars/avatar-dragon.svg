@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><defs><radialGradient id="dragon-bg" cx=".35" cy=".3" r=".85"><stop offset="0" stop-color="#e6f7e3"/><stop offset="1" stop-color="#8fcf9a"/></radialGradient></defs>
+  <rect width="128" height="128" fill="url(#dragon-bg)"/>
+  <path d="M30 50c-10-6-18-2-18 8 6-4 10-2 14 2-6 2-8 8-6 12 6-6 12-6 16-4Z" fill="#7fb7e6"/><path d="M98 50c10-6 18-2 18 8-6-4-10-2-14 2 6 2 8 8 6 12-6-6-12-6-16-4Z" fill="#7fb7e6"/>
+  <path d="M48 28l4 12m28-12-4 12" stroke="#f2c94c" stroke-width="5" stroke-linecap="round"/>
+  <ellipse cx="64" cy="70" rx="34" ry="32" fill="#4caf6a"/>
+  <path d="M44 84c6 14 34 14 40 0-8 6-32 6-40 0Z" fill="#c8ebb8"/>
+  <circle cx="52" cy="64" r="7" fill="#fff"/><circle cx="76" cy="64" r="7" fill="#fff"/><circle cx="53" cy="65" r="4" fill="#1d2b20"/><circle cx="77" cy="65" r="4" fill="#1d2b20"/>
+  <circle cx="58" cy="80" r="2" fill="#2d6a40"/><circle cx="70" cy="80" r="2" fill="#2d6a40"/>
+  <path d="M60 40l4-8 4 8" fill="#f2c94c"/></svg>

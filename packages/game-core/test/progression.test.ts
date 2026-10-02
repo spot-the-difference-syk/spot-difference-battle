@@ -123,10 +123,33 @@ describe("player growth", () => {
     expect(bought).toMatchObject({ ok: true, growth: { coins: 1_800, ownedItems: ["avatar-cat"], loadout: { avatar: "avatar-cat" } } });
     if (!bought.ok) throw new Error("purchase failed");
     expect(publicCosmetics(bought.growth.loadout)).toEqual({ avatar: "avatar-cat", profile: "profile-none", title: "title-visitor" });
-    for (const item of COSMETIC_ITEMS.filter((entry) => entry.slot === "avatar" && entry.price > 0)) {
-      expect(item.price).toBeGreaterThanOrEqual(500);
-      expect(item.price).toBeLessThanOrEqual(3_000);
+  });
+
+  it("spreads many items over levels 1 to 50 with prices that rise with level", () => {
+    expect(new Set(COSMETIC_ITEMS.map((item) => item.id)).size).toBe(COSMETIC_ITEMS.length);
+    for (const slot of COSMETIC_SLOTS) expect(COSMETIC_ITEMS.filter((item) => item.slot === slot).length, slot).toBeGreaterThanOrEqual(15);
+    for (const item of COSMETIC_ITEMS) {
+      expect(item.minLevel, item.id).toBeGreaterThanOrEqual(1);
+      expect(item.minLevel, item.id).toBeLessThanOrEqual(PROGRESSION_RULES.maxLevel);
+      if (item.price === 0) continue;
+      // 레벨 1~9는 400~2,600, 이후 구간마다 비싸지고 최고 15,000코인
+      expect(item.price, item.id).toBeGreaterThanOrEqual(item.minLevel >= 30 ? 6_500 : item.minLevel >= 20 ? 4_000 : item.minLevel >= 10 ? 2_000 : 400);
+      expect(item.price, item.id).toBeLessThanOrEqual(item.minLevel >= 40 ? 15_000 : item.minLevel >= 30 ? 10_000 : item.minLevel >= 20 ? 7_500 : item.minLevel >= 10 ? 4_500 : 3_000);
     }
+    // 5레벨마다 무료로 받는 것이 있다.
+    for (let level = 5; level <= PROGRESSION_RULES.maxLevel; level += 5) {
+      expect(COSMETIC_ITEMS.some((item) => item.minLevel === level && item.price === 0 && !item.rewardOnly), `level ${level}`).toBe(true);
+    }
+  });
+
+  it("stops at the maximum level and keeps counting experience", () => {
+    let xp = 0;
+    for (let level = 1; level < PROGRESSION_RULES.maxLevel; level += 1) xp += xpForLevel(level);
+    expect(growthView({ ...emptyGrowth(), totalXp: xp - 1 }).level).toBe(PROGRESSION_RULES.maxLevel - 1);
+    const top = growthView({ ...emptyGrowth(), totalXp: xp + 100_000 });
+    expect(top).toMatchObject({ level: PROGRESSION_RULES.maxLevel, totalXp: xp + 100_000 });
+    expect(top.levelXp).toBe(top.levelXpGoal);
+    expect(top.ownedItemIds).toEqual(expect.arrayContaining(["title-legend", "profile-legend", "avatar-laurel"]));
   });
 
   it("gives every slot a free default item", () => {

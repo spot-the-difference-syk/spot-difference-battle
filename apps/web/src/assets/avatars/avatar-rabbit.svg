@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><defs><radialGradient id="rabbit-bg" cx=".35" cy=".3" r=".85"><stop offset="0" stop-color="#e7eefb"/><stop offset="1" stop-color="#a9bde6"/></radialGradient></defs>
+  <rect width="128" height="128" fill="url(#rabbit-bg)"/>
+  <path d="M44 62C38 40 36 18 46 16s14 24 12 44ZM84 62c6-22 8-44-2-46S68 40 70 60Z" fill="#fff"/>
+  <path d="M46 56c-3-14-4-30 0-32s8 16 7 32ZM82 56c3-14 4-30 0-32s-8 16-7 32Z" fill="#f4b6c6"/>
+  <ellipse cx="64" cy="80" rx="32" ry="28" fill="#fff"/>
+  <circle cx="52" cy="76" r="4.5" fill="#2a2a2e"/><circle cx="76" cy="76" r="4.5" fill="#2a2a2e"/>
+  <circle cx="44" cy="88" r="5" fill="#f4b6c6" opacity=".7"/><circle cx="84" cy="88" r="5" fill="#f4b6c6" opacity=".7"/>
+  <path d="M60 86h8l-4 4Z" fill="#e88aa2"/><path d="M64 90c-2 4-6 4-8 2m8-2c2 4 6 4 8 2" stroke="#888" stroke-width="2" fill="none" stroke-linecap="round"/></svg>

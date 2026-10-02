@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><defs><radialGradient id="cactus-bg" cx=".35" cy=".3" r=".85"><stop offset="0" stop-color="#fbe7d3"/><stop offset="1" stop-color="#f0b98f"/></radialGradient></defs>
+  <rect width="128" height="128" fill="url(#cactus-bg)"/>
+  <path d="M56 40c0-10 16-10 16 0v50H56Z" fill="#5f9e62"/>
+  <path d="M56 66H46c-6 0-8-4-8-10v-8c0-6 8-6 8 0v8h10ZM72 58h10v-6c0-6 8-6 8 0v6c0 6-2 10-8 10H72Z" fill="#5f9e62"/>
+  <path d="M64 36v52M45 50v6M85 52v4" stroke="#4a8250" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="64" cy="32" r="5" fill="#ef7f9b"/>
+  <path d="M40 88h48l-6 26H46Z" fill="#c8673e"/><rect x="36" y="84" width="56" height="9" rx="3" fill="#d97b4f"/></svg>

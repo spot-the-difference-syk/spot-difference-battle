@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><defs><radialGradient id="hedgehog-bg" cx=".35" cy=".3" r=".85"><stop offset="0" stop-color="#f7efd9"/><stop offset="1" stop-color="#d9c08a"/></radialGradient></defs>
+  <rect width="128" height="128" fill="url(#hedgehog-bg)"/>
+  <path d="M22 92c-4-24 10-50 38-56l-6-10 14 6 4-12 6 12 12-6-2 12 12-2-6 10c10 8 14 20 12 32Z" fill="#7a5638"/>
+  <path d="M30 76l-8-6m12-6-10-8m18-4-6-12m16 0-2-12" stroke="#5e3f27" stroke-width="3" stroke-linecap="round"/>
+  <path d="M40 92c0-18 12-30 30-30 20 0 34 12 34 30 0 10-14 16-32 16S40 102 40 92Z" fill="#f1d9b5"/>
+  <circle cx="74" cy="82" r="4" fill="#2a2a2e"/><circle cx="104" cy="88" r="5" fill="#2a2a2e"/>
+  <circle cx="64" cy="94" r="5" fill="#f2a7a0" opacity=".7"/></svg>

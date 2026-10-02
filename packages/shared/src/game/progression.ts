@@ -110,6 +110,8 @@ export const PROGRESSION_RULES = {
   /** 레벨 1→2에 필요한 경험치. 레벨마다 levelStepXp씩 늘어난다. */
   baseLevelXp: 100,
   levelStepXp: 20,
+  /** 최고 레벨. 도달하면 경험치는 계속 쌓이지만 레벨은 오르지 않는다(레벨 50까지 약 28,400 경험치). */
+  maxLevel: 50,
   /** 솔로 완주로 인정하는 최소 기록. 이보다 빠르면 조작으로 보고 보상하지 않는다. */
   minimumSoloElapsedMs: 3_000,
   rememberedMatchCount: 20,
@@ -177,7 +179,7 @@ export function xpForLevel(level: number): number {
 export function growthView(progress: PlayerGrowth, nowMs = Date.now()): GrowthView {
   let level = 1;
   let remaining = Math.max(0, Math.floor(progress.totalXp));
-  while (remaining >= xpForLevel(level)) {
+  while (level < PROGRESSION_RULES.maxLevel && remaining >= xpForLevel(level)) {
     remaining -= xpForLevel(level);
     level += 1;
   }
@@ -186,7 +188,8 @@ export function growthView(progress: PlayerGrowth, nowMs = Date.now()): GrowthVi
   return {
     level,
     totalXp: progress.totalXp,
-    levelXp: remaining,
+    // 최고 레벨이면 막대를 가득 채운다.
+    levelXp: level >= PROGRESSION_RULES.maxLevel ? xpForLevel(level) : remaining,
     levelXpGoal: xpForLevel(level),
     coins: progress.coins,
     ownedItemIds: ownedItemIds(progress, level),

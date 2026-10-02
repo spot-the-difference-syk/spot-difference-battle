@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><defs><radialGradient id="penguin-bg" cx=".35" cy=".3" r=".85"><stop offset="0" stop-color="#e3f2fb"/><stop offset="1" stop-color="#8fc4e3"/></radialGradient></defs>
+  <rect width="128" height="128" fill="url(#penguin-bg)"/>
+  <path d="M64 20c22 0 34 22 34 50v30c0 10-14 16-34 16s-34-6-34-16V70c0-28 12-50 34-50Z" fill="#26313f"/>
+  <path d="M64 40c14 0 22 16 22 34v24c0 8-10 12-22 12s-22-4-22-12V74c0-18 8-34 22-34Z" fill="#fff"/>
+  <circle cx="54" cy="58" r="4" fill="#26313f"/><circle cx="74" cy="58" r="4" fill="#26313f"/>
+  <path d="M56 66h16l-8 8Z" fill="#f2a33a"/>
+  <path d="M34 84h60v10H34Z" fill="#d9534f"/><path d="M80 90h10v18H80Z" fill="#d9534f"/></svg>

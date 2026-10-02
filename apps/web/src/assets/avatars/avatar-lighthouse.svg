@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><defs><linearGradient id="lighthouse-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14254d"/><stop offset="1" stop-color="#3b5b96"/></linearGradient></defs>
+  <rect width="128" height="128" fill="url(#lighthouse-bg)"/>
+  <path d="M64 34 4 14v40Zm0 0 60-20v40Z" fill="#fff2b8" opacity=".35"/>
+  <path d="M52 44h24l6 62H46Z" fill="#f4f1ea"/>
+  <path d="M50 62h28l1.5 12h-31ZM48 84h32l1.5 12h-35Z" fill="#d9483b"/>
+  <rect x="54" y="30" width="20" height="14" rx="2" fill="#f7d77a"/>
+  <path d="M50 30l14-10 14 10Z" fill="#d9483b"/>
+  <path d="M0 108c16-6 30-6 46 0s30 6 46 0 26-4 36 0v20H0Z" fill="#1d3768"/>
+  <circle cx="22" cy="26" r="1.5" fill="#fff"/><circle cx="104" cy="70" r="1.5" fill="#fff"/></svg>

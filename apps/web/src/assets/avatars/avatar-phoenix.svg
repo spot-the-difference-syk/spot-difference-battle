@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><defs><radialGradient id="phoenix-bg" cx=".5" cy=".45" r=".7"><stop offset="0" stop-color="#5a1e2b"/><stop offset="1" stop-color="#1e0b16"/></radialGradient><linearGradient id="phoenix-fire" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#d9483b"/><stop offset=".6" stop-color="#f2a33a"/><stop offset="1" stop-color="#f7e08a"/></linearGradient></defs>
+  <rect width="128" height="128" fill="url(#phoenix-bg)"/>
+  <path d="M64 70C44 56 26 54 10 34c8 26 18 40 36 46-14 2-22 0-32-6 10 16 26 20 42 16Z" fill="url(#phoenix-fire)"/>
+  <path d="M64 70c20-14 38-16 54-36-8 26-18 40-36 46 14 2 22 0 32-6-10 16-26 20-42 16Z" fill="url(#phoenix-fire)"/>
+  <path d="M56 92c-6 12-4 22 8 28 12-6 14-16 8-28Z" fill="url(#phoenix-fire)"/>
+  <ellipse cx="64" cy="72" rx="12" ry="22" fill="#f2a33a"/>
+  <circle cx="64" cy="48" r="11" fill="#f7c35a"/><path d="M64 36c-4-8 0-14 6-16-2 6 0 10 2 14Z" fill="#f7e08a"/>
+  <path d="M72 48l10 3-10 3Z" fill="#d9a23a"/><circle cx="66" cy="46" r="2.5" fill="#1e0b16"/></svg>
