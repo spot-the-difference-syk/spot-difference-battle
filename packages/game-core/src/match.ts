@@ -1,8 +1,8 @@
 import {
   DEFAULT_MATCH_SETTINGS,
   GAME_CONFIG,
-  GAME_DIFFICULTY_RULES,
   GAME_MODE_RULES,
+  matchSettingsFrom,
   type AnswerRegion,
   type FoundMark,
   type GameEndReason,
@@ -135,7 +135,7 @@ export class GameMatch {
       state.puzzles,
       state.players.map(({ playerId, nickname }) => ({ playerId, nickname })) as [MatchPlayer, MatchPlayer],
       undefined,
-      state.settings ?? DEFAULT_MATCH_SETTINGS,
+      matchSettingsFrom(state.settings) ?? DEFAULT_MATCH_SETTINGS,
     );
     match.state = state.state;
     match.stateVersion = state.stateVersion;
@@ -234,13 +234,10 @@ export class GameMatch {
       throw new GameRuleError("WRONG_PUZZLE", "현재 풀고 있는 문제가 아닙니다.");
     }
     const foundIds = player.foundIdsByPuzzle[player.puzzleIndex]!;
-    const radiusMultiplier = GAME_DIFFICULTY_RULES[this.settings.difficulty].hitRadiusMultiplier;
     const hit = puzzle.differences.find((difference) =>
-      difference.regions.some((region) => isPointInAnswerRegion(point, { ...region, radius: region.radius * radiusMultiplier })),
+      difference.regions.some((region) => isPointInAnswerRegion(point, region)),
     );
-    const matchedRegion = hit?.regions.find((region) =>
-      isPointInAnswerRegion(point, { ...region, radius: region.radius * radiusMultiplier }),
-    ) ?? null;
+    const matchedRegion = hit?.regions.find((region) => isPointInAnswerRegion(point, region)) ?? null;
     const alreadyFound = hit ? foundIds.has(hit.id) : false;
     let puzzleCompleted = false;
 
@@ -265,7 +262,7 @@ export class GameMatch {
     } else if (!hit) {
       player.wrongAnswerCount += 1;
       player.correctStreak = 0;
-      player.inputLockedUntilMs = nowMs + GAME_DIFFICULTY_RULES[this.settings.difficulty].wrongAnswerLockSeconds * 1_000;
+      player.inputLockedUntilMs = nowMs + GAME_CONFIG.wrongAnswerLockSeconds * 1_000;
       this.bumpVersion();
       const limit = GAME_MODE_RULES[this.settings.mode].wrongAnswerLimit;
       if (limit !== null && player.wrongAnswerCount >= limit) {

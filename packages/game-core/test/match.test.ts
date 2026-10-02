@@ -207,9 +207,9 @@ describe("GameMatch simultaneous race", () => {
     const match = new GameMatch("sprint", puzzles, [
       { playerId: "p1", nickname: "첫째" },
       { playerId: "p2", nickname: "둘째" },
-    ], 1_000, { mode: "SPRINT", difficulty: "NORMAL" });
+    ], 1_000, { mode: "SPRINT" });
     const startedAt = startPlaying(match);
-    expect(match.snapshot("p1").settings).toEqual({ mode: "SPRINT", difficulty: "NORMAL" });
+    expect(match.snapshot("p1").settings).toEqual({ mode: "SPRINT" });
     expect(match.expire(startedAt + 59_999)).toBe(false);
     expect(match.expire(startedAt + 60_000)).toBe(true);
     expect(match.snapshot("p1")).toMatchObject({ state: "FINISHED", endReason: "TIMEOUT" });
@@ -219,7 +219,7 @@ describe("GameMatch simultaneous race", () => {
     const match = new GameMatch("survival", puzzles, [
       { playerId: "p1", nickname: "첫째" },
       { playerId: "p2", nickname: "둘째" },
-    ], 1_000, { mode: "SURVIVAL", difficulty: "NORMAL" });
+    ], 1_000, { mode: "SURVIVAL" });
     const now = startPlaying(match);
     match.guess("p1", "enchanted-forest", { x: 0.95, y: 0.1 }, now + 10);
     match.guess("p1", "enchanted-forest", { x: 0.95, y: 0.1 }, now + 1_011);
@@ -228,18 +228,16 @@ describe("GameMatch simultaneous race", () => {
     expect(match.snapshot("p1")).toMatchObject({ state: "FINISHED", winnerId: "p2", endReason: "MISTAKE_LIMIT" });
   });
 
-  it("adjusts hit tolerance and wrong-answer lock by difficulty", () => {
+  it("uses one hit radius and a one-second wrong-answer lock, and drops the difficulty of old saved matches", () => {
     const players = [
       { playerId: "p1", nickname: "첫째" },
       { playerId: "p2", nickname: "둘째" },
     ] as [{ playerId: string; nickname: string }, { playerId: string; nickname: string }];
-    const easy = new GameMatch("easy", puzzles, players, 1_000, { mode: "STANDARD", difficulty: "EASY" });
-    const easyNow = startPlaying(easy);
-    expect(easy.guess("p1", "enchanted-forest", { x: 0.255, y: 0.2 }, easyNow + 10).correct).toBe(true);
-
-    const hard = new GameMatch("hard", puzzles, players, 1_000, { mode: "STANDARD", difficulty: "HARD" });
-    const hardNow = startPlaying(hard);
-    const wrong = hard.guess("p1", "enchanted-forest", { x: 0.255, y: 0.2 }, hardNow + 10);
-    expect(wrong).toMatchObject({ correct: false, inputLockedUntilMs: hardNow + 2_010 });
+    const match = new GameMatch("one-rule", puzzles, players, 1_000, { mode: "STANDARD" });
+    const now = startPlaying(match);
+    // 예전 '쉬움'에서만 맞던 자리는 이제 오답이고 잠금은 1초다.
+    expect(match.guess("p1", "enchanted-forest", { x: 0.255, y: 0.2 }, now + 10)).toMatchObject({ correct: false, inputLockedUntilMs: now + 1_010 });
+    const saved = { ...match.serialize(), settings: { mode: "SPRINT", difficulty: "HARD" } } as unknown as ReturnType<GameMatch["serialize"]>;
+    expect(GameMatch.restore(saved).snapshot("p1").settings).toEqual({ mode: "SPRINT" });
   });
 });

@@ -1,4 +1,4 @@
-import { GAME_DIFFICULTY_RULES, GAME_MODE_RULES, type GameDifficulty, type GameMode, type GamePuzzleId, type NormalizedPoint, type ReportReason, type RewardSummary } from "@spot-battle/shared";
+import { GAME_CONFIG, GAME_MODE_RULES, type GameMode, type GamePuzzleId, type NormalizedPoint, type ReportReason, type RewardSummary } from "@spot-battle/shared";
 import { Flag, LogOut, Trophy, WifiOff } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppHeader, BoardPair, PaperScreen, ProgressTrack, RESET_VIEWPORT, Segmented, StageScreen, ZoomControls, type AppTab } from "../features/gallery/components/Gallery";
@@ -36,12 +36,6 @@ const MODE_DESCRIPTIONS: Record<GameMode, string> = {
   SPRINT: "60초 초고속 대결",
   SURVIVAL: "오답 3번이면 바로 패배",
 };
-const DIFFICULTY_OPTIONS = [["EASY", "쉬움"], ["NORMAL", "보통"], ["HARD", "어려움"]] as const;
-const DIFFICULTY_DESCRIPTIONS: Record<GameDifficulty, string> = {
-  EASY: "넓은 판정",
-  NORMAL: "기본 판정",
-  HARD: "정밀 판정",
-};
 
 export default function App() {
   const game = useGameClient();
@@ -77,7 +71,6 @@ function Screens({ game }: { game: GameClient }) {
   const [originalNoticeCount, setOriginalNoticeCount] = useState(0);
   const [nicknameInput, setNicknameInput] = useState(game.nickname);
   const [mode, setMode] = useState<GameMode>("STANDARD");
-  const [difficulty, setDifficulty] = useState<GameDifficulty>("NORMAL");
   const [reportReason, setReportReason] = useState<ReportReason>("UNFAIR");
   const [preloadError, setPreloadError] = useState<string | null>(null);
   const [preloadAttempt, setPreloadAttempt] = useState(0);
@@ -93,7 +86,9 @@ function Screens({ game }: { game: GameClient }) {
   const puzzleId = game.snapshot?.currentPuzzleId ?? null;
   const puzzle = puzzleId ? visualFor(puzzleId) : null;
   const inputLocked = Boolean(me?.inputLockedUntilMs && me.inputLockedUntilMs > game.serverNow());
-  const lockSeconds = GAME_DIFFICULTY_RULES[game.snapshot?.settings?.difficulty ?? "NORMAL"].wrongAnswerLockSeconds;
+  const lockSeconds = GAME_CONFIG.wrongAnswerLockSeconds;
+  /** 서버가 이번 경기에 고른 화풍. 한 경기의 그림은 모두 같은 화풍이다. */
+  const matchGenre = game.match?.deck?.[0]?.genre ?? null;
   const reconnectCount = useRef(0);
   useEffect(() => {
     if (!game.connected) reconnectCount.current += 1;
@@ -178,9 +173,8 @@ function Screens({ game }: { game: GameClient }) {
           <section className="panel grid gap-3">
             <h2 className="section-title">대결하기</h2>
             <Segmented label="게임 모드" value={mode} options={MODE_OPTIONS} onChange={setMode}/>
-            <Segmented label="난이도" value={difficulty} options={DIFFICULTY_OPTIONS} onChange={setDifficulty}/>
-            <p className="muted text-[13px] font-medium">{MODE_DESCRIPTIONS[mode]} · {GAME_MODE_RULES[mode].durationSeconds}초<br/>{DIFFICULTY_DESCRIPTIONS[difficulty]} · 오답 시 {GAME_DIFFICULTY_RULES[difficulty].wrongAnswerLockSeconds}초 잠금</p>
-            <button data-testid="matchmaking-start" type="button" disabled={!game.connected} onClick={() => game.startMatching({ mode, difficulty })} className="btn-primary w-full">{game.connected ? "상대 찾기" : "서버 연결 중"}</button>
+            <p className="muted text-[13px] font-medium">{MODE_DESCRIPTIONS[mode]} · {GAME_MODE_RULES[mode].durationSeconds}초<br/>그림 화풍은 매번 무작위예요 · 오답 시 {GAME_CONFIG.wrongAnswerLockSeconds}초 잠금</p>
+            <button data-testid="matchmaking-start" type="button" disabled={!game.connected} onClick={() => game.startMatching({ mode })} className="btn-primary w-full">{game.connected ? "상대 찾기" : "서버 연결 중"}</button>
             <p className="muted text-center text-[12px]">그림을 모두 먼저 끝내면 바로 승리해요</p>
           </section>
           <ArtworkShelf/>
@@ -194,7 +188,7 @@ function Screens({ game }: { game: GameClient }) {
     <section data-testid="matching-screen" className="center-card fade-up">
       <div className="spinner-ring"/>
       <h1 className="display-title mt-8">상대를 찾고 있어요</h1>
-      <p className="muted mt-2 text-[15px]">같은 모드와 난이도를 고른 사람과 연결해요.</p>
+      <p className="muted mt-2 text-[15px]">같은 모드를 고른 사람과 연결해요. 그림 화풍은 서버가 정해요.</p>
       <button type="button" onClick={game.cancelMatching} className="btn-secondary mt-8">매칭 취소</button>
     </section>
   </PaperScreen>;
@@ -252,7 +246,7 @@ function Screens({ game }: { game: GameClient }) {
     <section data-testid="countdown-screen" className="center-card">
       <div key={remaining ?? 0} className="big-number tick">{remaining ?? 0}</div>
       <h1 className="mt-4 text-xl font-bold">곧 시작해요</h1>
-      {puzzle && <p className="mt-1 text-sm text-white/55">첫 그림 · {puzzle.title}</p>}
+      {puzzle && <p className="mt-1 text-sm text-white/55">{matchGenre ? `${matchGenre} · ` : ""}첫 그림 · {puzzle.title}</p>}
     </section>
     {overlays}
   </StageScreen>;
@@ -271,7 +265,8 @@ function Screens({ game }: { game: GameClient }) {
         <span className="vs">대</span>
         <div className="grid justify-items-center gap-2"><LevelAvatar nickname={game.match.opponentNickname} growth={null} size={64} profile={game.match.opponentCosmetics?.profile} avatar={game.match.opponentCosmetics?.avatar}/><p className="font-bold">{game.match.opponentNickname}</p><p className="muted text-[12px] font-semibold">{titleName(game.match.opponentCosmetics?.title)}</p></div>
       </div>
-      <p className="muted mt-6 text-[15px]">두 사람 모두 같은 그림을 동시에 풀어요.</p>
+      {matchGenre && <p data-testid="match-genre" className="match-genre mt-6"><span>이번 대결</span><strong>{matchGenre}</strong><span>{snapshot.totalPuzzleCount}점</span></p>}
+      <p className="muted mt-3 text-[15px]">두 사람 모두 같은 그림을 동시에 풀어요.</p>
       <button data-testid="ready-button" type="button" disabled={me?.ready} onClick={game.ready} className="btn-primary mt-6 w-full">{me?.ready ? "준비 완료 · 상대를 기다리는 중" : "준비 완료"}</button>
     </section>}
 

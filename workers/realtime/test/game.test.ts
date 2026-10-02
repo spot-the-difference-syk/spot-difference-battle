@@ -32,7 +32,7 @@ async function harness(archive?: Archive, catalog = [GAME_PUZZLES[0]!]) {
   const snapshot = (p: TestPeer) => p.frames.filter((f) => f.event === "game:snapshot").at(-1)!.payload as GameSnapshot;
   const token = (p: TestPeer) => (p.frames.find((f) => f.event === "session:ready")!.payload as { guestToken: string }).guestToken;
   const action = (p: TestPeer, event: string, payload: Record<string, unknown> = {}) => game.action(p, event, { ...snapshot(p), expectedState: snapshot(p).state, expectedStateVersion: snapshot(p).stateVersion, ...payload });
-  const join = (p: TestPeer, settings = { mode: "STANDARD", difficulty: "NORMAL" }) => game.action(p, "queue:join", { nickname: "테스터", settings });
+  const join = (p: TestPeer, settings: Record<string, unknown> = { mode: "STANDARD" }) => game.action(p, "queue:join", { nickname: "테스터", settings });
   const start = async () => {
     const first = await add(); const second = await add();
     await join(first); await join(second);
@@ -57,12 +57,17 @@ async function harness(archive?: Archive, catalog = [GAME_PUZZLES[0]!]) {
 }
 
 describe("Cloudflare authoritative game", () => {
-  it("broadcasts and archives the first ten-puzzle finisher immediately", async () => {
+  it("deals a single-genre deck and broadcasts and archives the first finisher immediately", async () => {
     const saved: unknown[] = [];
     const h = await harness({ async save(state) { saved.push(state); }, async report() { return "report"; } }, [...GAME_PUZZLES]);
     const { first, second } = await h.start();
-    expect(h.snapshot(first).totalPuzzleCount).toBe(10);
-    for (let index = 0; index < 10; index += 1) {
+    // 번들 대결 그림은 실사 5·카툰 3점이라 한 경기는 그중 한 화풍만 쓴다.
+    const total = h.snapshot(first).totalPuzzleCount;
+    const deck = (first.frames.find((f) => f.event === "match:found")!.payload as MatchFoundPayload).deck!;
+    expect(deck).toHaveLength(total);
+    expect([3, 5]).toContain(total);
+    expect(new Set(deck.map((card) => card.genre)).size).toBe(1);
+    for (let index = 0; index < total; index += 1) {
       const id = h.snapshot(first).currentPuzzleId;
       const puzzle = GAME_PUZZLES.find((candidate) => candidate.id === id)!;
       for (const difference of puzzle.differences) {
@@ -80,10 +85,11 @@ describe("Cloudflare authoritative game", () => {
   });
   it("matches only identical settings and can leave a queue", async () => {
     const h = await harness(); const a = await h.add(); const b = await h.add();
-    await h.join(a); await h.join(b, { mode: "SPRINT", difficulty: "NORMAL" });
+    await h.join(a); await h.join(b, { mode: "SPRINT" });
     expect(a.frames.some((f) => f.event === "match:found")).toBe(false);
     await h.game.action(b, "queue:leave");
-    await h.join(b);
+    // 예전 앱이 보내는 난이도는 무시하고 같은 모드끼리 매칭한다.
+    await h.join(b, { mode: "STANDARD", difficulty: "HARD" });
     expect(h.snapshot(a).matchId).toBe(h.snapshot(b).matchId);
   });
   it("runs countdown, judges a guess privately, rejects a forged match ID", async () => {

@@ -1,5 +1,5 @@
 import { GameMatch, GameRuleError, type MatchPuzzle, type PersistedMatchState } from "@spot-battle/game-core";
-import { DEFAULT_MATCH_SETTINGS, GAME_CONFIG, GAME_DIFFICULTIES, GAME_MODES, buyCosmetic, emptyGrowth, equipCosmetic, grantRankingReward, grantSoloReward, growthView, matchJourney, settleMatch, normalizeGrowth, publicCosmetics, type MatchSettings, type PlayerGrowth, type PlayerGrowthPayload, type PublicCosmetics, type RankEntry, type SoloRun, type WeeklyRewardGrant } from "@spot-battle/shared";
+import { GAME_CONFIG, buyCosmetic, emptyGrowth, equipCosmetic, grantRankingReward, grantSoloReward, growthView, matchJourney, matchSettingsFrom, settleMatch, normalizeGrowth, publicCosmetics, type MatchSettings, type PlayerGrowth, type PlayerGrowthPayload, type PublicCosmetics, type RankEntry, type SoloRun, type WeeklyRewardGrant } from "@spot-battle/shared";
 import { GAME_PUZZLES } from "../../../apps/server/src/game/puzzle-catalog.js";
 import { CatalogService, codeCatalog } from "../../../apps/server/src/game/catalog-service.js";
 import { SoloLeague, emptyLeagueState, type LeagueState } from "../../../apps/server/src/game/solo-league.js";
@@ -342,14 +342,14 @@ export class RealtimeGame {
     if (old && !terminal(old.match)) throw new GameRuleError("ALREADY_IN_MATCH", "진행 중인 경기를 먼저 마쳐주세요.");
     const nickname = string(input, "nickname").trim().slice(0, 16);
     if (nickname.length < 2) throw new GameRuleError("INVALID_NICKNAME", "닉네임은 2자 이상이어야 합니다.");
-    const raw = input.settings === undefined ? DEFAULT_MATCH_SETTINGS : object(input.settings);
-    if (!GAME_MODES.includes(raw.mode as never) || !GAME_DIFFICULTIES.includes(raw.difficulty as never)) throw new GameRuleError("INVALID_SETTINGS", "지원하지 않는 게임 설정입니다.");
-    const settings = { mode: raw.mode, difficulty: raw.difficulty } as MatchSettings;
+    // 예전 앱이 보내는 난이도는 무시한다.
+    const settings = matchSettingsFrom(input.settings);
+    if (!settings) throw new GameRuleError("INVALID_SETTINGS", "지원하지 않는 게임 설정입니다.");
     // Finished matches remain available for reports until the player queues again.
     if (old) old.retiredPlayers = [...new Set([...(old.retiredPlayers ?? []), session.playerId])];
     session.nickname = nickname;
     this.removeWaiting(session.playerId);
-    const key = `${settings.mode}:${settings.difficulty}`;
+    const key = settings.mode;
     const waiting = this.waiting.get(key);
     const opponent = waiting && this.peers().find((p) => p.playerId === waiting.playerId);
     if (!waiting || !opponent) {

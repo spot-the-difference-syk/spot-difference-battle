@@ -243,7 +243,8 @@ export class SupabasePostgresMatchStore implements MatchStore {
           snapshot.stateVersion,
           JSON.stringify(state.puzzles),
           settings.mode,
-          settings.difficulty,
+          // 난이도는 없어졌지만 기존 열(NOT NULL, EASY/NORMAL/HARD)에는 고정값을 넣는다.
+          "NORMAL",
           GAME_MODE_RULES[settings.mode].durationSeconds,
           state.puzzles.length,
           state.puzzles.reduce((total, puzzle) => total + puzzle.differences.length, 0),

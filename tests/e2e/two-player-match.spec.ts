@@ -33,7 +33,7 @@ function pointsForPuzzle(puzzleId: string | null): Array<{ x: number; y: number 
     return point;
   });
 }
-test("the first player to clear the deck wins immediately", async ({ browser }) => {
+test("the server deals one genre and the first player to clear the deck wins immediately", async ({ browser }) => {
   const first = await createPlayer(browser, "빠른사람", { width: 1280, height: 900 });
   const second = await createPlayer(browser, "도전자", { width: 390, height: 844 });
   try {
@@ -45,6 +45,11 @@ test("the first player to clear the deck wins immediately", async ({ browser }) 
       expect(first.page.getByTestId("ready-screen")).toBeVisible(),
       expect(second.page.getByTestId("ready-screen")).toBeVisible(),
     ]);
+    // 서버가 이번 경기의 화풍 하나를 정한다(번들: 실사 5점 또는 카툰 3점).
+    await expect(first.page.getByTestId("match-genre")).toHaveText(/이번 대결(실사5점|카툰3점)/);
+    const genreText = await first.page.getByTestId("match-genre").textContent();
+    await expect(second.page.getByTestId("match-genre")).toHaveText(genreText ?? "");
+    const totalPuzzleCount = Number(/(\d+)점/.exec(genreText ?? "")![1]);
     await Promise.all([
       first.page.getByTestId("ready-button").click(),
       second.page.getByTestId("ready-button").click(),
@@ -62,7 +67,7 @@ test("the first player to clear the deck wins immediately", async ({ browser }) 
 
     await first.page.getByTestId("original-board").click();
     await expect(first.page.getByRole("status")).toContainText("수정본에서 선택해주세요");
-    await expectProgress(first.page, 1, GAME_PUZZLE_IDS.length, 0);
+    await expectProgress(first.page, 1, totalPuzzleCount, 0);
 
     const playingScreen = first.page.getByTestId("playing-screen");
     const firstPuzzleId = await playingScreen.getAttribute("data-puzzle-id");
@@ -83,7 +88,6 @@ test("the first player to clear the deck wins immediately", async ({ browser }) 
     await second.page.mouse.down();
     await second.page.mouse.move(boardBox.x + boardBox.width / 2, boardBox.y + boardBox.height / 2 + 120, { steps: 5 });
     await second.page.mouse.up();
-    const totalPuzzleCount = GAME_PUZZLE_IDS.length;
     await expectProgress(second.page, 1, totalPuzzleCount, 0);
     await second.page.getByRole("button", { name: "원래 크기" }).click();
     await expect(second.page.getByTestId("zoom-controls")).toContainText("1.0배");
@@ -110,7 +114,7 @@ test("the first player to clear the deck wins immediately", async ({ browser }) 
     await expect(first.page.getByTestId("player-level")).toContainText("레벨 2");
     await first.page.getByRole("button", { name: "로비로 돌아가기" }).click();
     await first.page.getByTestId("me-open").click();
-    await expect(first.page.getByTestId("collection-count")).toHaveText(`${totalPuzzleCount} / ${totalPuzzleCount + 5}`);
+    await expect(first.page.getByTestId("collection-count")).toHaveText(`${totalPuzzleCount} / ${GAME_PUZZLE_IDS.length + 5}`);
   } finally {
     await first.context.close();
     await second.context.close();

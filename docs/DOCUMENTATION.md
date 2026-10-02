@@ -1,7 +1,7 @@
 # 문서 운영 기준
 
 > 문서 상태: CURRENT
-> 기준일: 2026-10-01
+> 기준일: 2026-10-02
 
 ## 단일 규칙 정본
 
@@ -24,7 +24,7 @@
 | 문서 | 책임 |
 |---|---|
 | `GAME_RULES.md` | 게임 규칙의 유일한 정본 |
-| `GAME_MODES.md` | 모드·난이도 요약 |
+| `GAME_MODES.md` | 모드·판정·화풍 출제 요약 |
 | `GAME_DESIGN.md` | 핵심 경험과 제품 목표 |
 | `MVP_DECISIONS.md` | 결정 이유와 변경 이력 |
 | `USER_FLOW.md`, `SCREEN_SPEC.md` | 사용자 흐름과 화면 요구 |

@@ -1,11 +1,9 @@
 export {
   DEFAULT_MATCH_SETTINGS,
   GAME_CONFIG,
-  GAME_DIFFICULTIES,
-  GAME_DIFFICULTY_RULES,
   GAME_MODES,
   GAME_MODE_RULES,
-  type GameDifficulty,
+  matchSettingsFrom,
   type GameMode,
   type MatchSettings,
 } from "./game/config.js";
