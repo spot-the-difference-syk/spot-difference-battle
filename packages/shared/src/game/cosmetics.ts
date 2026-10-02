@@ -65,6 +65,9 @@ export const COSMETIC_ITEMS: readonly CosmeticItem[] = [
   premium("marker", "marker-sparkle", "반짝이 가루", "작은 별들이 반짝이며 맴돌아요", 5000),
   premium("marker", "marker-butterfly", "나비", "찾은 곳에 나비가 날개짓해요", 7000),
   premium("marker", "marker-firework", "불꽃놀이", "찾을 때마다 불꽃이 터져요", 9000),
+  premium("marker", "marker-ripple", "물결 파문", "찾은 곳에 물결이 번져요", 5000),
+  premium("marker", "marker-heartpop", "하트 뿅뿅", "하트가 둥실둥실 떠올라요", 7000),
+  premium("marker", "marker-magic", "마법진", "빛나는 마법진이 돌아요", 10000),
 
   // 액자: 내 화면의 그림 두 장을 감싸는 테두리
   item("frame", "frame-none", "액자 없음", "그림만 깔끔하게", 0),
@@ -87,6 +90,9 @@ export const COSMETIC_ITEMS: readonly CosmeticItem[] = [
   premium("frame", "frame-sakura", "벚꽃 액자", "꽃잎이 흩날리는 분홍 액자", 9000),
   premium("frame", "frame-starry", "별밤 액자", "소용돌이치는 별밤이 흐르는 액자", 12000),
   premium("frame", "frame-masterpiece", "명작 금장", "미술관 명작에 두르는 조각 금장", 16000),
+  premium("frame", "frame-lace", "레이스", "하얀 레이스를 두른 액자", 8000),
+  premium("frame", "frame-jade", "비취", "금줄을 두른 비취 옥 액자", 13000),
+  premium("frame", "frame-cosmos", "우주", "성운이 흐르는 우주 액자", 15000),
 
   // 프로필 그림: 상대에게도 보인다. 그림은 apps/web/src/assets/avatars/<ID>.svg
   item("avatar", "avatar-initial", "첫 글자", "닉네임 첫 글자를 보여줘요", 0),
@@ -121,6 +127,12 @@ export const COSMETIC_ITEMS: readonly CosmeticItem[] = [
   premium("avatar", "avatar-wave", "큰 파도", "붉은 해 아래 굽이치는 파도", 8000),
   premium("avatar", "avatar-starry", "별이 빛나는 밤", "소용돌이 하늘에 별이 반짝여요", 9000),
   premium("avatar", "avatar-galaxywhale", "은하 고래", "별바다를 헤엄치는 고래", 10000),
+  premium("avatar", "avatar-goldfish", "어항 금붕어", "보글보글 어항 속 금붕어", 6000),
+  premium("avatar", "avatar-lanternrabbit", "등불 토끼", "흔들리는 등불을 든 토끼", 7000),
+  premium("avatar", "avatar-snowglobe", "스노볼", "눈이 내리는 작은 마을", 7000),
+  premium("avatar", "avatar-firefly", "반딧불 숲", "반딧불이 깜빡이는 밤 숲", 8000),
+  premium("avatar", "avatar-skycastle", "구름 위 성", "구름이 흐르는 하늘 성", 9000),
+  premium("avatar", "avatar-aurorafox", "오로라 여우", "오로라 아래 눈밭의 여우", 10000),
 
   // 프로필 테두리: 상대에게도 보인다.
   item("profile", "profile-none", "기본 테두리", "레벨 링만 보여요", 0),
@@ -144,6 +156,9 @@ export const COSMETIC_ITEMS: readonly CosmeticItem[] = [
   premium("profile", "profile-orbit", "별 궤도", "작은 별이 프로필을 돌아요", 8000),
   premium("profile", "profile-flame", "불꽃", "일렁이는 불꽃 테두리", 10000),
   premium("profile", "profile-galaxy", "은하수", "별가루가 흐르는 은하수 고리", 12000),
+  premium("profile", "profile-petals", "꽃잎 화관", "꽃잎이 프로필을 감싸며 돌아요", 8000),
+  premium("profile", "profile-prism", "프리즘", "빛이 무지개로 흘러요", 10000),
+  premium("profile", "profile-lightning", "번개", "푸른 번개가 번쩍여요", 12000),
 
   // 칭호: 상대에게도 보인다. 5레벨마다 무료 칭호
   item("title", "title-visitor", "새내기 관람객", "처음 전시를 찾은 관람객", 0),

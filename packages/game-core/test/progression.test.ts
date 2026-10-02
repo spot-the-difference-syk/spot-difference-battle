@@ -128,7 +128,7 @@ describe("player growth", () => {
   it("spreads many items over levels 1 to 50 with prices that rise with level", () => {
     expect(new Set(COSMETIC_ITEMS.map((item) => item.id)).size).toBe(COSMETIC_ITEMS.length);
     for (const slot of COSMETIC_SLOTS) expect(COSMETIC_ITEMS.filter((item) => item.slot === slot).length, slot).toBeGreaterThanOrEqual(15);
-    expect(COSMETIC_ITEMS.filter((item) => item.premium).length).toBeGreaterThanOrEqual(15);
+    expect(COSMETIC_ITEMS.filter((item) => item.premium).length).toBeGreaterThanOrEqual(30);
     for (const item of COSMETIC_ITEMS) {
       expect(item.minLevel, item.id).toBeGreaterThanOrEqual(1);
       expect(item.minLevel, item.id).toBeLessThanOrEqual(PROGRESSION_RULES.maxLevel);

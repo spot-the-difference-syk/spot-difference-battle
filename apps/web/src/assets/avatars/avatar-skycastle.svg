@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><defs><linearGradient id="sk-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffc9a8"/><stop offset=".55" stop-color="#ffdcc4"/><stop offset="1" stop-color="#c7d8ff"/></linearGradient>
+<linearGradient id="sk-wall" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#f4eee8"/><stop offset="1" stop-color="#cfc4d8"/></linearGradient></defs>
+<style>.cl{animation:cl 7s ease-in-out infinite alternate}.cl2{animation:cl 9s ease-in-out infinite alternate-reverse}@keyframes cl{to{transform:translateX(10px)}}.fl{animation:flag 1.2s ease-in-out infinite alternate;transform-origin:64px 22px}@keyframes flag{to{transform:scaleX(.75)}}@media (prefers-reduced-motion: reduce){*{animation:none!important}}</style>
+<rect width="128" height="128" fill="url(#sk-bg)"/>
+<circle cx="100" cy="30" r="10" fill="#fff3d6"/>
+<g class="cl2"><ellipse cx="22" cy="40" rx="16" ry="5" fill="#fff" opacity=".8"/></g>
+<rect x="44" y="40" width="40" height="46" fill="url(#sk-wall)"/>
+<rect x="36" y="34" width="14" height="52" fill="url(#sk-wall)"/><rect x="78" y="34" width="14" height="52" fill="url(#sk-wall)"/>
+<rect x="58" y="22" width="12" height="30" fill="url(#sk-wall)"/>
+<path d="M34 34l9-16 9 16ZM76 34l9-16 9 16ZM56 22l8-14 8 14Z" fill="#6f5fc7"/>
+<path d="M64 8v-4" stroke="#6b4a3a" stroke-width="1.5"/><path class="fl" d="M64 4h10l-3 3 3 3H64Z" fill="#e2452f"/>
+<path d="M58 86v-14c0-4 3-7 6-7s6 3 6 7v14Z" fill="#6b4a3a"/>
+<g fill="#f7d77a"><rect x="40" y="46" width="5" height="7" rx="2.5"/><rect x="83" y="46" width="5" height="7" rx="2.5"/><rect x="61" y="30" width="6" height="8" rx="3"/><rect x="50" y="56" width="5" height="7" rx="2.5"/><rect x="73" y="56" width="5" height="7" rx="2.5"/></g>
+<g class="cl"><path d="M8 96c0-10 12-14 20-8 4-10 20-10 24 0 6-6 18-4 20 4 6-6 20-6 24 2 8-4 22 0 22 10 0 8-8 12-16 12H22c-8 0-14-8-14-20Z" fill="#fff"/>
+<path d="M14 110h100" stroke="#e3e7ff" stroke-width="3" stroke-linecap="round"/></g>
+<path d="M0 116c20-6 40-6 64-2s44 4 64-2v16H0Z" fill="#fff" opacity=".85"/></svg>
