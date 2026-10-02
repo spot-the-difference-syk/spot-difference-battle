@@ -1,4 +1,4 @@
-import { COSMETIC_ITEM_BY_ID, type GrowthView, type RewardSummary } from "@spot-battle/shared";
+import { COSMETIC_ITEM_BY_ID, PROGRESSION_RULES, type GrowthView, type RewardSummary } from "@spot-battle/shared";
 
 /** 프로필 그림. 파일 이름이 아이템 ID다(avatar-cat.svg → "avatar-cat"). */
 const AVATAR_IMAGES: Readonly<Record<string, string>> = Object.fromEntries(
@@ -51,7 +51,9 @@ export function ProfileBadge({ nickname, growth }: { nickname: string; growth: G
 export function XpBar({ growth, tone = "light" }: { growth: GrowthView; tone?: "light" | "dark" }) {
   return <div className={`xp-bar ${tone}`}>
     <div className="xp-track"><i style={{ width: `${levelRatio(growth) * 100}%` }}/></div>
-    <div className="xp-label"><span>경험치 {growth.levelXp} / {growth.levelXpGoal}</span><span>다음 레벨까지 {growth.levelXpGoal - growth.levelXp}</span></div>
+    {growth.level >= PROGRESSION_RULES.maxLevel
+      ? <div className="xp-label"><span>최고 레벨이에요</span><span>누적 경험치 {growth.totalXp.toLocaleString("ko-KR")}</span></div>
+      : <div className="xp-label"><span>경험치 {growth.levelXp} / {growth.levelXpGoal}</span><span>다음 레벨까지 {growth.levelXpGoal - growth.levelXp}</span></div>}
   </div>;
 }
 

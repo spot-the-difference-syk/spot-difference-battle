@@ -57,7 +57,9 @@ export function Wardrobe({ nickname, growth, error, onTab, onBuy, onEquip }: {
 }) {
   const [slot, setSlot] = useState<CosmeticSlot>("marker");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const items = COSMETIC_ITEMS.filter((entry) => entry.slot === slot);
+  // 해금 레벨·가격 순으로 늘어놓아 앞으로 무엇을 얻을지 보이게 한다. 랭킹 보상은 맨 뒤
+  const items = COSMETIC_ITEMS.filter((entry) => entry.slot === slot)
+    .sort((a, b) => Number(Boolean(a.rewardOnly)) - Number(Boolean(b.rewardOnly)) || a.minLevel - b.minLevel || a.price - b.price);
   const current = COSMETIC_ITEM_BY_ID[selectedId ?? growth?.loadout[slot] ?? ""];
   const visibleSelected = current?.slot === slot ? current : items[0]!;
   // Preview the selected item on top of what is already equipped.

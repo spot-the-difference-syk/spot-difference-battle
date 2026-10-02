@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><defs><radialGradient id="gem-bg" cx=".5" cy=".4" r=".75"><stop offset="0" stop-color="#e8f1ff"/><stop offset="1" stop-color="#7d93c7"/></radialGradient></defs>
+  <rect width="128" height="128" fill="url(#gem-bg)"/>
+  <path d="M30 50 46 28h36l16 22-34 52Z" fill="#2f6fd6"/>
+  <path d="M30 50h68L64 102Z" fill="#1f4fa8"/>
+  <path d="M46 28l6 22h24l6-22Z" fill="#7fb2ff"/><path d="M52 50h24L64 102Z" fill="#3b7ae6"/>
+  <path d="M46 28 30 50h22ZM82 28l16 22H76Z" fill="#5a95f0"/>
+  <path d="M54 32l-3 14" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".8"/>
+  <path d="M100 22l2.5 6 6 2.5-6 2.5-2.5 6-2.5-6-6-2.5 6-2.5ZM24 86l2 4.5 4.5 2-4.5 2-2 4.5-2-4.5-4.5-2 4.5-2Z" fill="#fff"/></svg>

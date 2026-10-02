@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><defs><radialGradient id="balloon-bg" cx=".35" cy=".3" r=".85"><stop offset="0" stop-color="#fdf1dc"/><stop offset="1" stop-color="#9cc7e8"/></radialGradient></defs>
+  <rect width="128" height="128" fill="url(#balloon-bg)"/>
+  <path d="M64 14c26 0 40 18 40 38 0 18-18 32-28 40H52C42 84 24 70 24 52c0-20 14-38 40-38Z" fill="#f2a33a"/>
+  <path d="M64 14c-10 0-16 18-16 38 0 16 4 30 4 40h24c0-10 4-24 4-40 0-20-6-38-16-38Z" fill="#e05d4f"/>
+  <path d="M64 14c-3 0-4 18-4 38 0 16 0 30 0 40h8c0-10 0-24 0-40 0-20-1-38-4-38Z" fill="#fbe6b8"/>
+  <path d="M52 92l4 12m20-12-4 12" stroke="#6b4423" stroke-width="2"/>
+  <rect x="54" y="102" width="20" height="14" rx="3" fill="#8a5a36"/>
+  <circle cx="22" cy="100" r="8" fill="#fff" opacity=".8"/><circle cx="32" cy="98" r="10" fill="#fff" opacity=".8"/><circle cx="104" cy="104" r="9" fill="#fff" opacity=".8"/></svg>
